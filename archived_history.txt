@@ -1,0 +1,505 @@
+commit e014a0da961351a8c915b6be5e039deb5b752e40
+Merge: bcaaae8 e4f629e
+Author: Gerald Manipon <gmanipon@jpl.nasa.gov>
+Date:   Thu Sep 14 14:07:30 2017 -0700
+
+    Merge pull request #2 from hysds-org/mstarch-actions
+    
+    mstarch: Fix explicit trigger rule
+
+commit e4f629e474d42b4fd645a1a589f6597b6325f0e6
+Merge: 7cd7254 bcaaae8
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Tue Sep 5 18:39:00 2017 +0000
+
+    mstarch: merge from master
+
+commit 7cd7254b7dc43a66ebf24da1ebcbacb97b56f5b6
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Tue Sep 5 18:37:50 2017 +0000
+
+    mstarch: adding action-type
+
+commit bcaaae8b242181367b2cf41c7e40635f61320f2b
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Thu Jul 20 10:21:30 2017 -0700
+
+    propagate ops account through to rule creation
+
+commit f2a00125f50adbbcdebab9aabb0c69e1bee6bbbe
+Author: M Starch <Micahel.D.Starch@jpl.nasa.gov>
+Date:   Wed Jul 19 21:01:35 2017 +0000
+
+    mstarch: fixing public sets, and adding _all user
+
+commit c182d268bfed2782f3bf3d91f94a4ea70c64fac9
+Author: gmanipon <gmanipon@jpl.nasa.gov>
+Date:   Thu Jul 13 15:28:18 2017 +0000
+
+    get username of system user if not defined in rules
+
+commit 7ffca9229c096f185b60a194bfd0e0398f1bcf69
+Author: gmanipon <gmanipon@jpl.nasa.gov>
+Date:   Thu Jul 13 02:34:26 2017 +0000
+
+    track username to be propagated to PROV-ES softwareAgent role
+
+commit 95646fccd4e3f36ebfd7d9f514bac7931d23e4b7
+Author: gmanipon <gmanipon@jpl.nasa.gov>
+Date:   Wed Jul 12 00:29:15 2017 +0000
+
+    ensure priority is either None or an int
+
+commit 08cfacb00c6240119daefd09842cd17afbc6ea90
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Mon Jun 19 13:11:35 2017 -0700
+
+    mstarch: updating hysds_common to update by overwrite not upsert
+
+commit 16b5d7797973eea2ba3d1f9ed572424e59cf2c7f
+Merge: 77e3300 b545cd0
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Wed May 24 21:28:04 2017 +0000
+
+    Merge branch 'master' of https://github.jpl.nasa.gov/hysds-org/hysds_commons
+
+commit 77e330035b28bf82363c5ef3e861e492f59f234e
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Wed May 24 21:27:34 2017 +0000
+
+    mstarch: making sure optional arguments are optional
+
+commit b545cd01dfa5d826946f4a064f9c8a8f942d8454
+Author: jlinick <Justin.P.Linick@jpl.nasa.gov>
+Date:   Tue May 23 01:52:54 2017 +0000
+
+    disable dedup for passthru, single queries
+
+commit 751f732498a8ff7fc9758baf5e0bc9dcd05c2a19
+Author: jlinick <Justin.P.Linick@jpl.nasa.gov>
+Date:   Mon May 22 21:24:49 2017 +0000
+
+    initial implementation of job dedup
+
+commit 0ec0f0aa5f44f5daa6fa09d0b7618b20c3580abe
+Merge: 4608a04 a1b59e9
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Wed Apr 19 16:43:56 2017 +0000
+
+    Merge branch 'master' of https://github.jpl.nasa.gov/hysds-org/hysds_commons into special-inputs
+
+commit 4608a045fb7fca38053d2f05780683a422d57739
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Tue Apr 11 17:29:47 2017 +0000
+
+    mstarch: refactoring type conversion, and a few pylint fixes
+
+commit 11db7b72c9ff716136f238e22861d2508002c981
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Tue Apr 11 17:14:24 2017 +0000
+
+    mstarch: adding a region to BBox lambda builtin and fixing pylint errors
+
+commit a82dd144ac822131dc0bbf0fc1eabd07a285b6df
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Tue Apr 11 16:27:03 2017 +0000
+
+    mstarch: handling optional params, and email types
+
+commit 66f85383cfe89cec6ca0a2f525637c81a7b2db49
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Mon Apr 10 22:29:52 2017 +0000
+
+    mstarch: fixing jobspec version type
+
+commit 7078c5f098e5f9c3999068a41b6c9cde3127e055
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Mon Apr 10 22:26:01 2017 +0000
+
+    mstarch: more string-like types
+
+commit c2e7880d3c3e082e381ba3deccd851607fb934bb
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Mon Apr 10 19:44:52 2017 +0000
+
+    mstarch: adding more string-like types
+
+commit fe100cd76ef415394a9663a94494a08d8d2fae33
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Mon Apr 10 19:03:43 2017 +0000
+
+    mstarch: fixing enum type handling
+
+commit be85ad331af292cf91737226af53d3fc4ea08996
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Mon Apr 10 18:35:58 2017 +0000
+
+    mstarch: allowing specialized inputs
+
+commit a1b59e9376320ee4fb385bb465d1818c7d68e420
+Author: gmanipon <gmanipon@jpl.nasa.gov>
+Date:   Tue Mar 28 02:13:23 2017 +0000
+
+    propagate tag to context
+
+commit a97c05a4b2d013d94f5f440033aeaadd42c8539c
+Author: gmanipon <gmanipon@jpl.nasa.gov>
+Date:   Mon Mar 27 18:17:41 2017 +0000
+
+    prevent from submitting to user_rules_* queues
+
+commit f7aac2ca24b6d6a65473174c6e43483dbfdb98d8
+Author: gmanipon <gmanipon@jpl.nasa.gov>
+Date:   Mon Mar 27 18:05:50 2017 +0000
+
+    protect from submitting to hysds orchestrator queues
+
+commit 8e5756b0dd69585b39d814b40578724e7225fbf7
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Tue Mar 14 21:06:20 2017 +0000
+
+    mstarch: deserializing tags from JSON if needed
+
+commit 28feb59c4eef8a0521b1128eafea8bcec34e7e24
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Tue Mar 14 20:30:42 2017 +0000
+
+    mstarch: allowing localize to handle lists, strings, and localize objects
+
+commit 546d956a7e9373ea10e90751c4e3211963b1299d
+Author: gmanipon <gmanipon@jpl.nasa.gov>
+Date:   Fri Mar 10 22:53:35 2017 +0000
+
+    clean job name issued by job_iterator: job_type from rule is actually the hysds-io spec name
+
+commit ae6c42e4753be3bc3a77dae95d6373606f242e2e
+Author: gmanipon <gmanipon@jpl.nasa.gov>
+Date:   Fri Mar 10 18:38:20 2017 +0000
+
+    handle job name for single submissions as well
+
+commit c8ec9010953b738d884def0980c85235de455b5a
+Author: gmanipon <gmanipon@jpl.nasa.gov>
+Date:   Fri Mar 10 17:47:57 2017 +0000
+
+    properly name jobs submitted by job_iterator
+
+commit 4c1ae0c162bad574edf507d840720d7691c6ac44
+Author: gmanipon <gmanipon@jpl.nasa.gov>
+Date:   Fri Mar 10 17:05:24 2017 +0000
+
+    change to job_name as job_id implies uniqueness and consistency
+
+commit 82ae8069213a5f0b1414b26cc32fecd42b581a52
+Author: gmanipon <gmanipon@jpl.nasa.gov>
+Date:   Fri Mar 10 17:00:36 2017 +0000
+
+    allow job id specification through submit_mozart_job()
+
+commit 431fb09b440d2bc3fb8c45835630ab2edacbeaed
+Author: gmanipon <gmanipon@jpl.nasa.gov>
+Date:   Fri Mar 10 16:24:55 2017 +0000
+
+    allow specifying _job_name in params to name job; fix bug in priority passing
+
+commit 1de5377f157193fc6dbac8dafd7d483c0e3487a9
+Author: gmanipon <gmanipon@jpl.nasa.gov>
+Date:   Fri Mar 10 15:58:45 2017 +0000
+
+    remove redundant function def
+
+commit 4e6c6a84159d82bdb4c6cff67f21bab932dc3c5f
+Author: gmanipon <gmanipon@jpl.nasa.gov>
+Date:   Mon Mar 6 15:22:53 2017 +0000
+
+    allow configuration of hard/soft time limits from job spec
+
+commit 7be3d5f4dc04f3440d4ff0be4c71151fa6862089
+Author: gmanipon <gmanipon@jpl.nasa.gov>
+Date:   Thu Mar 2 15:39:45 2017 +0000
+
+    cleanup single/run_query logic; use any() instead of functools.reduce() to allow short-circuit
+
+commit 1ccb40046b99cf1f2e24284fd9d3fc3b9252b181
+Author: gmanipon <gmanipon@jpl.nasa.gov>
+Date:   Thu Mar 2 04:00:48 2017 +0000
+
+    remove bad log line
+
+commit a5b458c7ec50d59ca48e7ef4292d4b489b0cc9fd
+Author: gmanipon <gmanipon@jpl.nasa.gov>
+Date:   Thu Mar 2 03:43:51 2017 +0000
+
+    remove bad logger line
+
+commit efde4d4512a17bb0694406d4c3842f6453838a7b
+Author: gmanipon <gmanipon@jpl.nasa.gov>
+Date:   Thu Mar 2 03:29:04 2017 +0000
+
+    fix empty filter and list and enable logging
+
+commit 62f636d8a0dd801fa7ac359369d8769a0942e4c8
+Author: gmanipon <gmanipon@jpl.nasa.gov>
+Date:   Tue Feb 28 19:04:26 2017 +0000
+
+    update resolve_hysds_job() to handle params according to type
+    
+    Fix bugs with using hysds logger.
+
+commit 9f2beb29a6bf586df5bd8bb5ac74ddfb16862be8
+Author: gmanipon <gmanipon@jpl.nasa.gov>
+Date:   Tue Feb 28 18:29:56 2017 +0000
+
+    specify explicit params
+
+commit 8be2b031281892cded6b22cd6b5756e5e570d0a6
+Author: gmanipon <gmanipon@jpl.nasa.gov>
+Date:   Tue Feb 28 18:23:47 2017 +0000
+
+    fix bug in printing size of generator
+
+commit 99294db2ff6bde6a5a5547681462e3739070601f
+Author: gmanipon <gmanipon@jpl.nasa.gov>
+Date:   Tue Feb 28 18:06:24 2017 +0000
+
+    make job-iterator submit through celery
+
+commit 71178bbc6cd297961e5276382830b405dae49ef7
+Author: gmanipon <gmanipon@jpl.nasa.gov>
+Date:   Tue Feb 28 17:07:54 2017 +0000
+
+    separate job resolving/submission functions by job JSON type
+
+commit f08f34adede246ccf9f69976f2ba3c2918dd1081
+Author: gmanipon <gmanipon@jpl.nasa.gov>
+Date:   Tue Feb 28 16:09:03 2017 +0000
+
+    refactored job resolver functions to job_utils
+
+commit 2f17401d38c4b538fa595a3b64d0dbebdd4ab9fc
+Author: gmanipon <gmanipon@jpl.nasa.gov>
+Date:   Mon Feb 27 22:52:50 2017 +0000
+
+    handle complex query
+
+commit 0b176eee71f87d1d492a59343715b43f98b1830b
+Author: gmanipon <gmanipon@jpl.nasa.gov>
+Date:   Mon Feb 27 22:38:45 2017 +0000
+
+    normalize query
+
+commit cdc608ead097082ffbc57633d323034b6f6de9c8
+Author: gmanipon <gmanipon@jpl.nasa.gov>
+Date:   Mon Feb 27 22:01:46 2017 +0000
+
+    cleanup
+
+commit 978ded68b24346254630fcc7c53e025198e0a04f
+Author: gmanipon <gmanipon@jpl.nasa.gov>
+Date:   Mon Feb 27 21:28:20 2017 +0000
+
+    add job iterator
+
+commit 43cb34460561565683cdcf9d679df3671bcd7d6d
+Author: gmanipon <gmanipon@jpl.nasa.gov>
+Date:   Mon Feb 27 19:19:53 2017 +0000
+
+    utilize .netrc to authenticate to rabbitmq admin interface
+    
+    Pass through requests error to enable advanced error handling instead of eating it up.
+
+commit b8988c63fdeda15b7e556991570912739bb2c40e
+Author: gmanipon <gmanipon@jpl.nasa.gov>
+Date:   Mon Feb 27 18:35:05 2017 +0000
+
+    add queue utils
+
+commit e514be298100d68232d6087b97ffe796d1db8b5d
+Author: gmanipon <gmanipon@jpl.nasa.gov>
+Date:   Mon Feb 27 18:22:07 2017 +0000
+
+    add version param
+
+commit 788b48807ba38fa6fe0a168b7eaf6ddc5580e4e6
+Author: gmanipon <gmanipon@jpl.nasa.gov>
+Date:   Mon Feb 27 17:25:44 2017 +0000
+
+    set default ops account as param; dump error if exception is caught
+
+commit b45a84efc167d2b2216ecea366562a054c525129
+Author: gmanipon <gmanipon@jpl.nasa.gov>
+Date:   Mon Feb 27 16:59:13 2017 +0000
+
+    optimize get_action_spec() and related library calls
+
+commit bc485a9dc003f74257103cb4078c7d0d039c8fcc
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Wed Feb 22 23:21:46 2017 +0000
+
+    mstarch: fixing display to put label in brackets
+
+commit 74304007b943785d6fe9308667895ff78224bf33
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Thu Feb 16 03:09:33 2017 +0000
+
+    mstarch: fixing best url
+
+commit e6440f2211e36dd9c842ddf93eb7dddbcad1c2f8
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Thu Feb 16 02:48:01 2017 +0000
+
+    mstarch: fixing lambda runs
+
+commit e540767f58bcdf8a7f0028cecde8e0b2be26f507
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Thu Feb 16 00:36:42 2017 +0000
+
+    mstarch: fixing aggregate iteration
+
+commit 17125e2c0c60810201128cb5dec1e9fb144e7ba8
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Wed Feb 15 22:46:48 2017 +0000
+
+    mstarch: fixing multi product set
+
+commit 35f4640befa969b692de495da1d51bfebd0ee211
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Wed Feb 15 22:08:40 2017 +0000
+
+    mstarch: fixes typo
+
+commit ca6d6b15bdf56486c79c234f2ca8e6151f127b9b
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Wed Feb 15 22:00:14 2017 +0000
+
+    mstarch: fixing syntax errors
+
+commit 196b80546754b0b4920e6e7bf8f24bcf233fadf1
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Wed Feb 15 17:23:10 2017 +0000
+
+    mstarch: allowing the submission of product sets
+
+commit 584ae914f0204adaaeec79deeb9e03062ce8a85c
+Author: gmanipon <gmanipon@jpl.nasa.gov>
+Date:   Tue Feb 14 00:52:19 2017 +0000
+
+    add queue override
+
+commit d07af9c8eb99d1763711c0e70802dbe40a545f3b
+Author: gmanipon <gmanipon@jpl.nasa.gov>
+Date:   Mon Feb 13 19:32:11 2017 +0000
+
+    clean out unused param from get_params_for_submission()
+    
+    Use global logger.
+
+commit 6b528c54439f5b058ee9c3feb1edfec5128e7619
+Author: gmanipon <gmanipon@jpl.nasa.gov>
+Date:   Mon Feb 13 17:12:32 2017 +0000
+
+    add logger
+
+commit f50cd8aa7931b13ce98ccce268997a54fa6371e2
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Wed Feb 8 03:47:26 2017 +0000
+
+    mstarch: actions now display labels
+
+commit 7a5922deafe28b4502ccbea1d9adb70e42e1528b
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Thu Feb 2 00:57:56 2017 +0000
+
+    mstarch: sorting lists
+
+commit 74c040a6e904102c5b892b4b523a281b737ef3d5
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Mon Jan 30 17:39:12 2017 +0000
+
+    action_utils.py
+
+commit ee1dd5ccdc1693369fecf5e623a0b406264806fa
+Author: gmanipon <gmanipon@jpl.nasa.gov>
+Date:   Thu Jan 26 16:20:37 2017 +0000
+
+    future-proof container resolution tools across platforms
+
+commit 9e6e0d2607becd295f975de700c9169d0a0202a9
+Author: gmanipon <gmanipon@jpl.nasa.gov>
+Date:   Thu Jan 26 16:03:24 2017 +0000
+
+    add linux-specific helper utils for localhost identity resolution
+
+commit 0032eabd400a8fa088bde7d06203aa79bed5d371
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Thu Jan 19 08:03:38 2017 +0000
+
+    mstarch: fixing type to job_type
+
+commit 0e0cc712357f26581167b18e590c32ec1dfd7e0c
+Merge: d7ab0cd 7a4edee
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Thu Jan 19 04:01:30 2017 +0000
+
+    mstarch: merging
+
+commit d7ab0cdc063c9b05a512761d3cb09666873ed0a4
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Thu Jan 19 04:00:04 2017 +0000
+
+    mstarch: tweaking kwarg and pass-through handling
+
+commit 7a4edeef1b8d51d4dae587f4510e5f2bf86331ef
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Thu Jan 19 00:52:55 2017 +0000
+
+    mstarch: fixing JSON issue
+
+commit 973808bc3d08fc2d73cd3d6ef4c5bd8227950298
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Wed Jan 18 22:07:50 2017 +0000
+
+    mstarch: fixing action utils to use wiring
+
+commit a9e34d103db7dfe602f0a9844d52523cd63e02ef
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Wed Jan 18 21:13:20 2017 +0000
+
+    mstarch: fixing name to rule_name
+
+commit 890332a1f3a0f06ff1538f0ef2e6f2aa971b5634
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Wed Jan 18 19:38:49 2017 +0000
+
+    mstarch: adding job-rest submission as library
+
+commit 9558f571c2b74356a0e9eba513ed5d60110ba93a
+Merge: 3c77527 5bd3887
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Thu Jan 12 18:06:11 2017 +0000
+
+    Merge branch 'master' of https://github.jpl.nasa.gov/hysds-org/hysds_commons
+
+commit 3c77527ea67a3896af3bdd71c92ba11113fdb333
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Thu Jan 12 18:06:02 2017 +0000
+
+    mstarch: passing job spec id to queue listing
+
+commit 5bd3887af8766392ee7b2d7492793f98757f80d7
+Author: gmanipon <gmanipon@jpl.nasa.gov>
+Date:   Thu Jan 12 17:09:38 2017 +0000
+
+    add .gitignore
+
+commit 5b67c6cdc89a81f8e9685093c9512ad3bf6a5d16
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Thu Jan 12 02:05:46 2017 +0000
+
+    mstarch: remmoving v1 support for actions
+
+commit eac5cb967b1d44319a191c7df19cd94c39ef924e
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Wed Jan 11 18:51:20 2017 +0000
+
+    mstarch: initial commit of hysds-stuff
