@@ -27,7 +27,7 @@ def get_container(es_url, ident, logger=None):
                                                        logger=logger)
 
 
-def add_container(es_url, name, url, version, digest=None, logger=None):
+def add_container(es_url, name, url, version, digest, logger=None):
     '''
     Ingests a container into the Mozart ElasticSearch index
     @param es_url - elasticsearch URL
