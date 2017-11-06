@@ -27,17 +27,19 @@ def get_container(es_url, ident, logger=None):
                                                        logger=logger)
 
 
-def add_container(es_url, name, url, version, logger=None):
+def add_container(es_url, name, url, version, digest=None, logger=None):
     '''
     Ingests a container into the Mozart ElasticSearch index
     @param es_url - elasticsearch URL
     @param name - name of object for ingestion into ES
     @param url - url of object for ingestion into ES
     @param version - version of object for ingestion into ES
+    @param digest - sha256 digest ID of container image
     '''
     return hysds_commons.metadata_rest_utils.add_metadata(es_url, CONTAINER_INDEX,
                                                           CONTAINER_TYPE, {
                                                             "id":name,
+                                                            "digest":digest,
                                                             "url":url,
                                                             "version":version},
                                                           logger=logger)
