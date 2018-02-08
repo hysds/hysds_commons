@@ -115,6 +115,12 @@ def iterate(component, rule):
 
             # disable dedup for passthru single submissions
             enable_dedup = False if not run_query and single else True
+            logger.info("enable_dedup: %s" % enable_dedup)
+
+            # override enable_dedup setting from hysdsio
+            if 'enable_dedup' in hysdsio:
+                enable_dedup = hysdsio['enable_dedup']
+                logger.info("hysdsio overrided enable_dedup: %s" % enable_dedup)
 
             ids.append(submit_mozart_job(product, rule, hysdsio,
                                          job_name=job_name,
