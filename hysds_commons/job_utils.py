@@ -313,6 +313,10 @@ def resolve_mozart_job(product, rule, hysdsio=None, es_hysdsio_url=None, queue=N
     job["params"] = json.dumps(params)
     #logger.info("job after adding params: %s" % json.dumps(job, indent=2))
 
+    # set enable_dedup setting from hysdsio
+    if 'enable_dedup' in hysdsio:
+        job['enable_dedup'] = hysdsio['enable_dedup']
+
     return job
 
 
@@ -431,7 +435,7 @@ def submit_hysds_job(job):
 
 def submit_mozart_job(product, rule, hysdsio=None, es_hysdsio_url=None,
                       queue=None, job_name=None, payload_hash=None,
-                      enable_dedup=True):
+                      enable_dedup=None):
     '''
     Resolve a Mozart job to a HySDS job and submit via celery
     @param product - product result body
@@ -441,17 +445,20 @@ def submit_mozart_job(product, rule, hysdsio=None, es_hysdsio_url=None,
     @param queue - (optional) job queue override
     @param job_name - (optional) base job name override
     @param payload_hash - (optional) user-generated payload hash
-    @param enable_dedup - (optional) flag to enable/disable job dedup
+    @param enable_dedup - (optional) flag to enable/disable job dedup; if None resolve from hysdsio
     '''
 
     # resolve mozart job
     moz_job = resolve_mozart_job(product, rule, hysdsio, es_hysdsio_url, queue)
     logger.info("resolved mozart job: {}".format(json.dumps(moz_job, indent=2)))
 
+    # enable dedup; param overrides hysdsio
+    dedup = moz_job.get('enable_dedup', True) if enable_dedup is None else enable_dedup
+
     # resolve hysds job
     job = resolve_hysds_job(moz_job['type'], moz_job['queue'], moz_job['priority'],
                             moz_job['tags'], moz_job['params'], job_name, 
-                            payload_hash, enable_dedup, moz_job['username'])
+                            payload_hash, dedup, moz_job['username'])
     logger.info("resolved HySDS job: {}".format(json.dumps(job, indent=2)))
 
     # submit hysds job
