@@ -322,7 +322,8 @@ def resolve_mozart_job(product, rule, hysdsio=None, es_hysdsio_url=None, queue=N
 
 def resolve_hysds_job(job_type=None, queue=None, priority=None, tags=None,
                       params=None, job_name=None, payload_hash=None,
-                      enable_dedup=True, username=None):
+                      enable_dedup=True, username=None, soft_time_limit=None,
+                      time_limit=None):
     '''
     Resolve HySDS job JSON.
     @param job_type - type of the job spec to go find
@@ -334,6 +335,8 @@ def resolve_hysds_job(job_type=None, queue=None, priority=None, tags=None,
     @param payload_hash - user-generated payload hash
     @param enable_dedup - flag to enable/disable job dedup
     @param username - username
+    @param soft_time_limit - soft time limit for job execution
+    @param time_limit - hard time limit for job execution
     '''
 
     # check args
@@ -372,9 +375,11 @@ def resolve_hysds_job(job_type=None, queue=None, priority=None, tags=None,
     # add docker value overlays
     overlays = specification.get("imported_worker_files", {})
 
-    # get hard/soft time limits
-    time_limit = specification.get('time_limit', None)
-    soft_time_limit = specification.get('soft_time_limit', None)
+    # get hard/soft time limits and override if specified
+    if time_limit is None:
+        time_limit = specification.get('time_limit', None) 
+    if soft_time_limit is None:
+        soft_time_limit = specification.get('soft_time_limit', None)
 
     # initialize hysds job JSON
     job = {
@@ -435,7 +440,8 @@ def submit_hysds_job(job):
 
 def submit_mozart_job(product, rule, hysdsio=None, es_hysdsio_url=None,
                       queue=None, job_name=None, payload_hash=None,
-                      enable_dedup=None):
+                      enable_dedup=None, soft_time_limit=None,
+                      time_limit=None):
     '''
     Resolve a Mozart job to a HySDS job and submit via celery
     @param product - product result body
@@ -446,6 +452,8 @@ def submit_mozart_job(product, rule, hysdsio=None, es_hysdsio_url=None,
     @param job_name - (optional) base job name override
     @param payload_hash - (optional) user-generated payload hash
     @param enable_dedup - (optional) flag to enable/disable job dedup; if None resolve from hysdsio
+    @param soft_time_limit - (optional) soft time limit for job execution
+    @param time_limit - (optional) hard time limit for job execution
     '''
 
     # resolve mozart job
@@ -457,8 +465,8 @@ def submit_mozart_job(product, rule, hysdsio=None, es_hysdsio_url=None,
 
     # resolve hysds job
     job = resolve_hysds_job(moz_job['type'], moz_job['queue'], moz_job['priority'],
-                            moz_job['tags'], moz_job['params'], job_name, 
-                            payload_hash, dedup, moz_job['username'])
+                            moz_job['tags'], moz_job['params'], job_name, payload_hash,
+                            dedup, moz_job['username'], soft_time_limit, time_limit)
     logger.info("resolved HySDS job: {}".format(json.dumps(job, indent=2)))
 
     # submit hysds job
