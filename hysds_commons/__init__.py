@@ -1,4 +1,4 @@
-__version__ = "0.1"
+__version__ = "0.1.2"
 __description__ = "Common HySDS Functions, Utilities, Etc."
 __url__         = "https://github.jpl.nasa.gov/hysds-org/hysds_commons"
 
