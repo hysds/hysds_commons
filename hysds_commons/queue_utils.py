@@ -13,6 +13,8 @@ HYSDS_QUEUES = (
     app.conf['DATASET_PROCESSED_QUEUE'],
     app.conf['USER_RULES_DATASET_QUEUE'],
     app.conf['USER_RULES_TRIGGER_QUEUE'],
+    app.conf['ON_DEMAND_DATASET_QUEUE'],
+    app.conf['ON_DEMAND_JOB_QUEUE'],
 )
 
 
