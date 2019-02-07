@@ -1,4 +1,5 @@
-import os, json 
+import os
+import json
 from hysds_commons.request_utils import requests_json_response
 
 
@@ -19,7 +20,8 @@ def mozart_call(mozart_url, method, data, version=DEFAULT_MOZART_VERSION, logger
     getpost = "GET"
     if method == "job/submit":
         getpost = "POST"
-    res = requests_json_response(getpost, url, data=data, verify=False, logger=logger)
+    res = requests_json_response(
+        getpost, url, data=data, verify=False, logger=logger)
     return res["result"]
 
 
@@ -31,7 +33,7 @@ def get_job_spec(mozart_url, ident, version=DEFAULT_MOZART_VERSION, logger=None)
     @param version - mozart API version
     @param logger - logger to log to
     '''
-    return mozart_call(mozart_url, "job_spec/type", {"id":ident}, version, logger)
+    return mozart_call(mozart_url, "job_spec/type", {"id": ident}, version, logger)
 
 
 def get_job_spec_list(mozart_url, version=DEFAULT_MOZART_VERSION, logger=None):
@@ -56,7 +58,7 @@ def get_queue_list(mozart_url, ident=None, version=DEFAULT_MOZART_VERSION, logge
 
     data = {}
     if not ident is None:
-         data = {"id":ident}
+        data = {"id": ident}
     return mozart_call(mozart_url, "queue/list", data, version, logger)
 
 

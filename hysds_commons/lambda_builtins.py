@@ -7,6 +7,7 @@ across lambda implementations.
 @author mstarch
 '''
 
+
 def get_best_url(urls, best_prefix=None):
     '''
     Return a single URL starting with the given prefix. If the prefix is None
@@ -18,13 +19,14 @@ def get_best_url(urls, best_prefix=None):
     '''
     best = None
     for url in urls:
-        #Return matching best
+        # Return matching best
         if not best_prefix is None and url.startswith(best_prefix):
             return url
-        #Set best as first not http
+        # Set best as first not http
         if best is None or (not url.startswith("http") and best.startswith("http")):
             best = url
     return best
+
 
 def get_partial_products(ident, base_url, product_relative_paths):
     '''
@@ -42,6 +44,7 @@ def get_partial_products(ident, base_url, product_relative_paths):
         })
     return localize
 
+
 def region_to_bbox(region):
     '''
     Converts from a hysdsio region type to a bbox.
@@ -54,7 +57,7 @@ def region_to_bbox(region):
     max_lat = -90
     min_lon = 360
     max_lon = -360
-    #Must handle multi-shape coordinats
+    # Must handle multi-shape coordinats
     for shape in coordinates:
         for point in shape:
             min_lat = min(min_lat, point[1])

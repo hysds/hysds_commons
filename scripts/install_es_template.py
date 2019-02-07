@@ -1,5 +1,8 @@
 #!/usr/bin/env python
-import os, sys, json, requests
+import os
+import sys
+import json
+import requests
 from jinja2 import Template
 
 from hysds.celery import app
@@ -22,10 +25,10 @@ if __name__ == "__main__":
     node = sys.argv[1]
     if node == "mozart":
         es_url = app.conf['JOBS_ES_URL']
-        indices = [ "containers", "job_specs", "hysds_ios" ]
+        indices = ["containers", "job_specs", "hysds_ios"]
     elif node == "grq":
         es_url = app.conf['GRQ_ES_URL']
-        indices = [ "hysds_ios" ]
+        indices = ["hysds_ios"]
     else:
         raise RuntimeError("Invalid node: %s" % node)
     tmpl_file = os.path.normpath(os.path.abspath(os.path.join(

@@ -1,4 +1,9 @@
-import os, pwd, json, traceback, types, collections
+import os
+import pwd
+import json
+import traceback
+import types
+import collections
 
 from hysds_commons.job_spec_utils import get_job_spec
 from hysds_commons.hysds_io_utils import get_hysds_io
@@ -12,8 +17,10 @@ from hysds.orchestrator import do_submit_job
 def get_username():
     """Get username."""
 
-    try: return pwd.getpwuid(os.getuid())[0]
-    except: return None
+    try:
+        return pwd.getpwuid(os.getuid())[0]
+    except:
+        return None
 
 
 def get_params_for_products_set(wiring, kwargs, passthrough=None, products=None):
@@ -26,9 +33,11 @@ def get_params_for_products_set(wiring, kwargs, passthrough=None, products=None)
     '''
 
     params = {}
-    if products is None: return params
+    if products is None:
+        return params
     for prod in products:
-        get_params_for_submission(wiring, kwargs, passthrough, prod, params, aggregate=True)
+        get_params_for_submission(
+            wiring, kwargs, passthrough, prod, params, aggregate=True)
     return params
 
 
@@ -64,6 +73,8 @@ def get_params_for_submission(wiring, kwargs, passthrough=None, product=None,
             val = run_lambda(wire, val)
             params[wire["name"]] = val
     return params
+
+
 def run_type_conversion(wire, val):
     '''
     Run a conversion from the input string to a known type
@@ -71,9 +82,9 @@ def run_type_conversion(wire, val):
     @param val: value to convert
     @returns: type converted value
     '''
-    #Unspefied types are text
+    # Unspefied types are text
     param_type = wire.get("type", "text")
-    #Unfilled optional parameters get the empty string as a converted type
+    # Unfilled optional parameters get the empty string as a converted type
     if wire.get("optional", False) and val.strip() == "":
         return val.strip()
     elif param_type == "number":
@@ -85,6 +96,7 @@ def run_type_conversion(wire, val):
     else:
         return val
 
+
 def run_lambda(wire, val):
     '''
     Runs the lambda key as a lambda function with 1 arg, the previous value
@@ -95,10 +107,11 @@ def run_lambda(wire, val):
     if "lambda" in wire:
         try:
             if not wire["lambda"].startswith("lambda:") and not wire["lambda"].startswith("lambda "):
-                raise RuntimeError("[ERROR] Failed to run lambda function, must be lambda expression taking 0 or 1 inputs")
+                raise RuntimeError(
+                    "[ERROR] Failed to run lambda function, must be lambda expression taking 0 or 1 inputs")
             import functools
             import lambda_builtins
-            namespace = { "functools":functools }
+            namespace = {"functools": functools}
             for name in dir(lambda_builtins):
                 if name.startswith("__"):
                     continue
@@ -106,7 +119,8 @@ def run_lambda(wire, val):
             fn = eval(wire["lambda"], namespace, {})
             val = fn(val)
         except Exception as e:
-            raise RuntimeError("[ERROR] Failed to run lambda function to fill {0}. {1}:{2}".format(wire["name"], type(e), e))
+            raise RuntimeError("[ERROR] Failed to run lambda function to fill {0}. {1}:{2}".format(
+                wire["name"], type(e), e))
     return val
 
 
@@ -119,23 +133,24 @@ def get_inputs(param, kwargs, rule=None, product=None):
     @param product - (optional) product hit for augmenting
     '''
 
-    #Break out if value is known
+    # Break out if value is known
     if "value" in param:
         ret = param["value"]
         return ret
     source = param.get("from", "unknown")
-    #Get a value
+    # Get a value
     ret = param.get("default_value", None)
     if source == "submitter":
         ret = kwargs.get(param.get("name", "unknown"), None)
     elif source == "passthrough" and not rule is None:
         ret = rule.get(param["name"], None)
     elif source.startswith("dataset_jpath:") and not product is None:
-        #If we are processing a list of products, create a list for outputs
+        # If we are processing a list of products, create a list for outputs
         ret = process_xpath(source.split(":")[1], product)
-    #Check value is found
+    # Check value is found
     if ret is None and not product is None and not rule is None:
-        raise RuntimeError("Failed to find '{0}' input from '{1}'".format(param.get("name", "unknown"), source))
+        raise RuntimeError("Failed to find '{0}' input from '{1}'".format(
+            param.get("name", "unknown"), source))
     return ret
 
 
@@ -151,7 +166,7 @@ def process_xpath(xpath, trigger):
     for part in parts:
         if ret is None or part == "":
             return ret
-        #Try to convert to integer, if possible, for list indicies
+        # Try to convert to integer, if possible, for list indicies
         try:
             part = int(part)
             if len(ret) <= part:
@@ -161,7 +176,7 @@ def process_xpath(xpath, trigger):
             continue
         except:
             pass
-        ret = ret.get(part,None)
+        ret = ret.get(part, None)
     return ret
 
 
@@ -172,23 +187,26 @@ def match_inputs(param, context):
     @param context - context of job specification
     '''
 
-    #Break out if value is known
+    # Break out if value is known
     if "value" in param:
         return
     source = param.get("source", "unknown")
-    #Get a value
+    # Get a value
     param["value"] = param.get("default_value", None)
     if source == "submitter":
-        param["value"] = context.get("inputs", {}).get(param.get("name", "unknown"),None)
+        param["value"] = context.get("inputs", {}).get(
+            param.get("name", "unknown"), None)
     elif source == "context":
         param["value"] = context.get(param.get("name"), None)
     elif source.startswith("xpath."):
-        param["value"] = process_xpath(source, context.get("trigger",{}))
-    #Check value is found
+        param["value"] = process_xpath(source, context.get("trigger", {}))
+    # Check value is found
     if param["value"] is None:
-        raise RuntimeError("Failed to find '{0}' input from '{1}'".format(param.get("name", "unknown"), source))
+        raise RuntimeError("Failed to find '{0}' input from '{1}'".format(
+            param.get("name", "unknown"), source))
 
-def fill_localize(value,localize_urls):
+
+def fill_localize(value, localize_urls):
     '''
     Fill the localize product list. Must handle a value that is one of the following:
         1. A URL as a string, should be wrapped like {"url":stinrg}
@@ -201,19 +219,21 @@ def fill_localize(value,localize_urls):
     '''
     # Check for string that need to be wrapped in
     # localize format
-    if isinstance(value,basestring):
-        localize_urls.append({"url":value})
+    if isinstance(value, basestring):
+        localize_urls.append({"url": value})
     # Check for objects that define the "url" field, and if so
     # they can be passed right in
-    elif not getattr(value,"get", None) is None and not value.get("url",None) is None:
+    elif not getattr(value, "get", None) is None and not value.get("url", None) is None:
         localize_urls.append(value)
     # Other types of objects must throw an error
-    elif not getattr(value,"get", None) is None:
-        raise ValueError("Invalid object of type {0} trying to be localized. {1}".format(type(value),value))
+    elif not getattr(value, "get", None) is None:
+        raise ValueError("Invalid object of type {0} trying to be localized. {1}".format(
+            type(value), value))
     # Handle lists and other iterables by recursing
     else:
         for val in value:
-            fill_localize(val,localize_urls)
+            fill_localize(val, localize_urls)
+
 
 def route_outputs(param, context, positional, localize_urls):
     '''
@@ -229,8 +249,8 @@ def route_outputs(param, context, positional, localize_urls):
         context[param["name"]] = param.get("value", "")
         positional.append(context[param["name"]])
     elif destination == "localize":
-        val =  param.get("value", "")
-        fill_localize(val,localize_urls)
+        val = param.get("value", "")
+        fill_localize(val, localize_urls)
     elif destination == "context":
         context[param["name"]] = param.get("value", "")
 
@@ -248,11 +268,11 @@ def get_command_line(command, positional):
     if not command is None:
         parts.append(command)
     for posit in positional:
-        #Escape any single quotes
+        # Escape any single quotes
         if not isinstance(posit, basestring):
             posit = "{0}".format(json.dumps(posit))
-        posit = posit.replace("'","'\"'\"'")
-        #Add in encapsulating single quotes
+        posit = posit.replace("'", "'\"'\"'")
+        # Add in encapsulating single quotes
         parts.append("'{0}'".format(posit))
     ret = " ".join(parts)
     return ret
@@ -277,7 +297,8 @@ def resolve_mozart_job(product, rule, hysdsio=None, es_hysdsio_url=None, queue=N
     queue = rule['queue'] if queue is None else queue
 
     # ensure priority is int
-    if rule['priority'] is not None: rule["priority"] = int(rule['priority'])
+    if rule['priority'] is not None:
+        rule["priority"] = int(rule['priority'])
 
     # this is the common data for all jobs, and will be copied for each individual submission
     if hysdsio is None and es_hysdsio_url is None:
@@ -301,10 +322,12 @@ def resolve_mozart_job(product, rule, hysdsio=None, es_hysdsio_url=None, queue=N
     # resolve parameters for job JSON
     if type(product) != type(dict()):
         logger.info("Products: %s" % product)
-        params = get_params_for_products_set(hysdsio, json.loads(rule["kwargs"]), rule, product)
+        params = get_params_for_products_set(
+            hysdsio, json.loads(rule["kwargs"]), rule, product)
     else:
         logger.info("Product: %s" % product)
-        params = get_params_for_submission(hysdsio, json.loads(rule["kwargs"]), rule, product)
+        params = get_params_for_submission(
+            hysdsio, json.loads(rule["kwargs"]), rule, product)
     #logger.info("job after get_params_for_submission: %s" % json.dumps(job, indent=2))
     #logger.info("params from get_params_for_submission: %s" % json.dumps(params, indent=2))
     logger.info("params: %s" % json.dumps(params, indent=2))
@@ -344,16 +367,22 @@ def resolve_hysds_job(job_type=None, queue=None, priority=None, tags=None,
         raise RuntimeError("'type' must be supplied in request")
     if queue is None:
         raise RuntimeError("'queue' must be supplied in request")
-    if params is None: params = {}
-    elif isinstance(params, types.StringTypes): params = json.loads(params)
-    elif isinstance(params, dict): pass
-    else: raise RuntimeError("Invalid arg type 'params': {} {}".format(type(params), params))
+    if params is None:
+        params = {}
+    elif isinstance(params, types.StringTypes):
+        params = json.loads(params)
+    elif isinstance(params, dict):
+        pass
+    else:
+        raise RuntimeError(
+            "Invalid arg type 'params': {} {}".format(type(params), params))
 
     # pull mozart job and container specs
     specification = get_job_spec(app.conf['JOBS_ES_URL'], job_type)
     container_id = specification.get("container", None)
     container_spec = get_container(app.conf['JOBS_ES_URL'], container_id)
-    logger.info("Running from: {0} in container: {1}".format(job_type, container_id))
+    logger.info("Running from: {0} in container: {1}".format(
+        job_type, container_id))
 
     # resolve inputs/outputs
     positional = []
@@ -361,11 +390,12 @@ def resolve_hysds_job(job_type=None, queue=None, priority=None, tags=None,
     localize_urls = specification.get("localize_urls", [])
     logger.info("params: {}".format(specification.get("params", [])))
     for param in specification.get("params", []):
-        #TODO: change to "check_inputs"
-        #match_inputs(param,context)
+        # TODO: change to "check_inputs"
+        # match_inputs(param,context)
         logger.info("param: {}".format(param))
         if not param["name"] in params:
-            raise RuntimeError("'params' must specify '{0}' parameter".format(param["name"]))
+            raise RuntimeError(
+                "'params' must specify '{0}' parameter".format(param["name"]))
         param["value"] = params[param["name"]]
         route_outputs(param, context, positional, localize_urls)
 
@@ -377,7 +407,7 @@ def resolve_hysds_job(job_type=None, queue=None, priority=None, tags=None,
 
     # get hard/soft time limits and override if specified
     if time_limit is None:
-        time_limit = specification.get('time_limit', None) 
+        time_limit = specification.get('time_limit', None)
     if soft_time_limit is None:
         soft_time_limit = specification.get('soft_time_limit', None)
 
@@ -392,27 +422,34 @@ def resolve_hysds_job(job_type=None, queue=None, priority=None, tags=None,
         "soft_time_limit": soft_time_limit,
         "enable_dedup": enable_dedup,
         "payload": {
-            "_command" : cmd,
+            "_command": cmd,
             "localize_urls": localize_urls,
         }
     }
 
-    #add optional parameters
-    if job_name is not None: job["job_name"] = job_name
+    # add optional parameters
+    if job_name is not None:
+        job["job_name"] = job_name
     if "disk_usage" in specification:
         job["payload"]["_disk_usage"] = specification.get("disk_usage")
-    if priority is not None: job["priority"] = priority
-    if payload_hash is not None: job["payload_hash"] = payload_hash
-    if username is not None: job["username"] = username
-    #deserialize tags, if needed
-    if isinstance(tags, types.StringTypes): tags = json.loads(tags)
-    if tags is not None: job["tags"] = tags
-    if tags is not None and len(tags) > 0: job["tag"] = tags[0]
+    if priority is not None:
+        job["priority"] = priority
+    if payload_hash is not None:
+        job["payload_hash"] = payload_hash
+    if username is not None:
+        job["username"] = username
+    # deserialize tags, if needed
+    if isinstance(tags, types.StringTypes):
+        tags = json.loads(tags)
+    if tags is not None:
+        job["tags"] = tags
+    if tags is not None and len(tags) > 0:
+        job["tag"] = tags[0]
     job["payload"]["job_specification"] = specification
     job["payload"]["container_specification"] = container_spec
 
-    #Merge in context wihout overwrite
-    for k,v in context.iteritems():
+    # Merge in context wihout overwrite
+    for k, v in context.iteritems():
         if not k in job["payload"]:
             job["payload"][k] = v
 
@@ -433,7 +470,7 @@ def submit_hysds_job(job):
     @param params - dictionary representing job params
     '''
 
-    logger.info("Submitting job:\n{0}".format(json.dumps(job,indent=2)))
+    logger.info("Submitting job:\n{0}".format(json.dumps(job, indent=2)))
     res = do_submit_job(job, 'jobs_processed')
     return res.id
 
@@ -458,10 +495,12 @@ def submit_mozart_job(product, rule, hysdsio=None, es_hysdsio_url=None,
 
     # resolve mozart job
     moz_job = resolve_mozart_job(product, rule, hysdsio, es_hysdsio_url, queue)
-    logger.info("resolved mozart job: {}".format(json.dumps(moz_job, indent=2)))
+    logger.info("resolved mozart job: {}".format(
+        json.dumps(moz_job, indent=2)))
 
     # enable dedup; param overrides hysdsio
-    dedup = moz_job.get('enable_dedup', True) if enable_dedup is None else enable_dedup
+    dedup = moz_job.get(
+        'enable_dedup', True) if enable_dedup is None else enable_dedup
 
     # resolve hysds job
     job = resolve_hysds_job(moz_job['type'], moz_job['queue'], moz_job['priority'],
