@@ -1,4 +1,5 @@
-import json, traceback
+import json
+import traceback
 
 from hysds_commons.job_utils import resolve_mozart_job
 from hysds_commons.mozart_utils import submit_job

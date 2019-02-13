@@ -1,8 +1,8 @@
 import hysds_commons.metadata_rest_utils
 
 
-JOB_SPEC_INDEX="job_specs"
-JOB_SPEC_TYPE="job_spec"
+JOB_SPEC_INDEX = "job_specs"
+JOB_SPEC_TYPE = "job_spec"
 
 
 def get_job_spec_types(es_url, logger=None):

@@ -1,8 +1,8 @@
 import hysds_commons.metadata_rest_utils
 
 
-HYSDS_IO_INDEX="hysds_ios"
-HYSDS_IO_TYPE="hysds_io"
+HYSDS_IO_INDEX = "hysds_ios"
+HYSDS_IO_TYPE = "hysds_io"
 
 
 def get_hysds_io_types(es_url, logger=None):
