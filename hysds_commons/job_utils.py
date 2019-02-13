@@ -110,7 +110,7 @@ def run_lambda(wire, val):
                 raise RuntimeError(
                     "[ERROR] Failed to run lambda function, must be lambda expression taking 0 or 1 inputs")
             import functools
-            import lambda_builtins
+            from . import lambda_builtins
             namespace = {"functools": functools}
             for name in dir(lambda_builtins):
                 if name.startswith("__"):
@@ -219,7 +219,7 @@ def fill_localize(value, localize_urls):
     '''
     # Check for string that need to be wrapped in
     # localize format
-    if isinstance(value, basestring):
+    if isinstance(value, str):
         localize_urls.append({"url": value})
     # Check for objects that define the "url" field, and if so
     # they can be passed right in
@@ -269,7 +269,7 @@ def get_command_line(command, positional):
         parts.append(command)
     for posit in positional:
         # Escape any single quotes
-        if not isinstance(posit, basestring):
+        if not isinstance(posit, str):
             posit = "{0}".format(json.dumps(posit))
         posit = posit.replace("'", "'\"'\"'")
         # Add in encapsulating single quotes
@@ -369,7 +369,7 @@ def resolve_hysds_job(job_type=None, queue=None, priority=None, tags=None,
         raise RuntimeError("'queue' must be supplied in request")
     if params is None:
         params = {}
-    elif isinstance(params, types.StringTypes):
+    elif isinstance(params, (str,)):
         params = json.loads(params)
     elif isinstance(params, dict):
         pass
@@ -439,7 +439,7 @@ def resolve_hysds_job(job_type=None, queue=None, priority=None, tags=None,
     if username is not None:
         job["username"] = username
     # deserialize tags, if needed
-    if isinstance(tags, types.StringTypes):
+    if isinstance(tags, (str,)):
         tags = json.loads(tags)
     if tags is not None:
         job["tags"] = tags
@@ -449,7 +449,7 @@ def resolve_hysds_job(job_type=None, queue=None, priority=None, tags=None,
     job["payload"]["container_specification"] = container_spec
 
     # Merge in context wihout overwrite
-    for k, v in context.iteritems():
+    for k, v in context.items():
         if not k in job["payload"]:
             job["payload"][k] = v
 

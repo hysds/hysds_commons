@@ -29,7 +29,7 @@ def get_all_queues(rabbitmq_admin_url):
     try:
         data = get_requests_json_response(
             os.path.join(rabbitmq_admin_url, "api/queues"))
-    except HTTPError, e:
+    except HTTPError as e:
         if e.response.status_code == 401:
             logger.error("Failed to authenticate to {}. Ensure credentials are set in .netrc.".format(
                 rabbitmq_admin_url))

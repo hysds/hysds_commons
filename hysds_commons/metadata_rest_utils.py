@@ -1,6 +1,6 @@
 import requests
 import json
-import request_utils
+from . import request_utils
 
 
 def get_types(es_url, es_index, logger=None):
