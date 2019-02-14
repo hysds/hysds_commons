@@ -328,7 +328,7 @@ def resolve_mozart_job(product, rule, hysdsio=None, es_hysdsio_url=None, queue=N
     #logger.info("job before get_params_for_submission: %s" % json.dumps(job, indent=2))
 
     # resolve parameters for job JSON
-    if type(product) != type(dict()):
+    if not isinstance(product, dict):
         logger.info("Products: %s" % product)
         params = get_params_for_products_set(
             hysdsio, json.loads(rule["kwargs"]), rule, product)
