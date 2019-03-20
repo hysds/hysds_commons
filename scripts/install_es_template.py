@@ -1,5 +1,15 @@
 #!/usr/bin/env python
-import os, sys, json, requests
+from __future__ import print_function
+from __future__ import unicode_literals
+from __future__ import division
+from __future__ import absolute_import
+from builtins import open
+from future import standard_library
+standard_library.install_aliases()
+import os
+import sys
+import json
+import requests
 from jinja2 import Template
 
 from hysds.celery import app
@@ -14,18 +24,18 @@ def write_template(es_url, index, tmpl_file):
     r = requests.delete(tmpl_url)
     r = requests.put(tmpl_url, data=tmpl)
     r.raise_for_status()
-    print r.json()
-    print "Successfully installed template %s at %s." % (index, tmpl_url)
+    print(r.json())
+    print("Successfully installed template %s at %s." % (index, tmpl_url))
 
 
 if __name__ == "__main__":
     node = sys.argv[1]
     if node == "mozart":
         es_url = app.conf['JOBS_ES_URL']
-        indices = [ "containers", "job_specs", "hysds_ios" ]
+        indices = ["containers", "job_specs", "hysds_ios"]
     elif node == "grq":
         es_url = app.conf['GRQ_ES_URL']
-        indices = [ "hysds_ios" ]
+        indices = ["hysds_ios"]
     else:
         raise RuntimeError("Invalid node: %s" % node)
     tmpl_file = os.path.normpath(os.path.abspath(os.path.join(

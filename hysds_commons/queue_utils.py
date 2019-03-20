@@ -1,3 +1,9 @@
+from __future__ import unicode_literals
+from __future__ import print_function
+from __future__ import division
+from __future__ import absolute_import
+from future import standard_library
+standard_library.install_aliases()
 import os
 from requests import HTTPError
 
@@ -26,9 +32,12 @@ def get_all_queues(rabbitmq_admin_url):
     @return: list of queues
     '''
 
-    try: data = get_requests_json_response(os.path.join(rabbitmq_admin_url, "api/queues"))
-    except HTTPError, e:
+    try:
+        data = get_requests_json_response(
+            os.path.join(rabbitmq_admin_url, "api/queues"))
+    except HTTPError as e:
         if e.response.status_code == 401:
-            logger.error("Failed to authenticate to {}. Ensure credentials are set in .netrc.".format(rabbitmq_admin_url)) 
+            logger.error("Failed to authenticate to {}. Ensure credentials are set in .netrc.".format(
+                rabbitmq_admin_url))
         raise
-    return [ obj["name"] for obj in data if not obj["name"].startswith("celery") and obj["name"] not in HYSDS_QUEUES ]
+    return [obj["name"] for obj in data if not obj["name"].startswith("celery") and obj["name"] not in HYSDS_QUEUES]

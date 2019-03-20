@@ -1,8 +1,14 @@
+from __future__ import unicode_literals
+from __future__ import print_function
+from __future__ import division
+from __future__ import absolute_import
+from future import standard_library
+standard_library.install_aliases()
 import hysds_commons.metadata_rest_utils
 
 
-CONTAINER_INDEX="containers"
-CONTAINER_TYPE="container"
+CONTAINER_INDEX = "containers"
+CONTAINER_TYPE = "container"
 
 
 def get_container_types(es_url, logger=None):
@@ -38,10 +44,10 @@ def add_container(es_url, name, url, version, digest, logger=None):
     '''
     return hysds_commons.metadata_rest_utils.add_metadata(es_url, CONTAINER_INDEX,
                                                           CONTAINER_TYPE, {
-                                                            "id":name,
-                                                            "digest":digest,
-                                                            "url":url,
-                                                            "version":version},
+                                                              "id": name,
+                                                              "digest": digest,
+                                                              "url": url,
+                                                              "version": version},
                                                           logger=logger)
 
 

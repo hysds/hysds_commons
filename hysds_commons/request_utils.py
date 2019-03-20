@@ -1,4 +1,13 @@
-import traceback, requests, json
+from __future__ import unicode_literals
+from __future__ import print_function
+from __future__ import division
+from __future__ import absolute_import
+from builtins import str
+from future import standard_library
+standard_library.install_aliases()
+import traceback
+import requests
+import json
 
 
 def requests_json_response(method, url, data="{}", ignore_errors=False, auth=None, verify=True, logger=None):
@@ -18,19 +27,24 @@ def requests_json_response(method, url, data="{}", ignore_errors=False, auth=Non
         elif method == "DELETE":
             r = requests.delete(url, auth=auth, verify=verify)
         else:
-            raise Exception("requests_json_response doesn't support request-method: {0}".format(method))
+            raise Exception(
+                "requests_json_response doesn't support request-method: {0}".format(method))
         r.raise_for_status()
-        return r.json() 
+        return r.json()
     except Exception as e:
-        message = "Failed to '{0}' to {1}. Exception: {2}:{3}.\nData: {4}".format(method, url, type(e), str(e), data)
-        #If the response is resolvable as JSON, return it in the message
+        message = "Failed to '{0}' to {1}. Exception: {2}:{3}.\nData: {4}".format(
+            method, url, type(e), str(e), data)
+        # If the response is resolvable as JSON, return it in the message
         try:
-            message = message + "\nResponse: {5}".format(json.dumps(r.json(), indent=2))
+            message = message + \
+                "\nResponse: {5}".format(json.dumps(r.json(), indent=2))
         except:
             pass
-        #Log if the logger was passed in
-        if not logger is None: logger.warning(message)
-        if not ignore_errors: raise(e)
+        # Log if the logger was passed in
+        if not logger is None:
+            logger.warning(message)
+        if not ignore_errors:
+            raise(e)
 
 
 def get_requests_json_response(url, **kwargs):
@@ -63,7 +77,8 @@ def post_scrolled_json_responses(url, es_url, generator=False, **kwargs):
 
     def getResultsGenerator():
         if not url.rstrip("/").endswith("_search"):
-            raise Exception("Scrolling only works on search URLs. {0} incompatible.".format(url))
+            raise Exception(
+                "Scrolling only works on search URLs. {0} incompatible.".format(url))
         setup_url = url + "?search_type=scan&scroll=10m&size=100"
         result = post_requests_json_response(setup_url, **kwargs)
         # Harvest scan-setup

@@ -1,5 +1,14 @@
 #!/bin/env python
-import copy, json, traceback
+from __future__ import unicode_literals
+from __future__ import print_function
+from __future__ import division
+from __future__ import absolute_import
+from builtins import str
+from future import standard_library
+standard_library.install_aliases()
+import copy
+import json
+import traceback
 import logging
 
 from hysds_commons.request_utils import post_scrolled_json_responses
@@ -42,12 +51,12 @@ def normalize_query(rule):
                 'and': filts
             }
         else:
-            final_query = { 
+            final_query = {
                 'filtered': {
                     'query': query
                 }
             }
-        final_query = { "query": final_query }
+        final_query = {"query": final_query}
         logger.info("final_query: %s" % json.dumps(final_query, indent=2))
         rule['query'] = final_query
         rule['query_string'] = json.dumps(final_query)
@@ -59,48 +68,53 @@ def iterate(component, rule):
     @param component - "mozart" or "tosca" where this submission came from
     @param rule - rule containing information for running jobs
     '''
-    #Accumulators variables
+    # Accumulators variables
     ids = []
     error_count = 0
     errors = []
-    
-    #Read config from "origin"
+
+    # Read config from "origin"
     es_url, es_index, ignore1 = get_component_config(component)
 
-    #Read in JSON formatted args and setup passthrough
+    # Read in JSON formatted args and setup passthrough
     normalize_query(rule)
-    if 'query' in rule.get('query', {}): queryobj = rule["query"]
-    else: queryobj = { "query": rule["query"] }
+    if 'query' in rule.get('query', {}):
+        queryobj = rule["query"]
+    else:
+        queryobj = {"query": rule["query"]}
 
-    #Get wiring
+    # Get wiring
     hysdsio = get_hysds_io(es_url, rule["job_type"], logger=logger)
 
-    #Is this a single submission 
+    # Is this a single submission
     passthru = rule.get('passthru_query', False)
-    single = hysdsio.get("submission_type", "individual" if passthru is True else "iteration") == "individual"
+    single = hysdsio.get(
+        "submission_type", "individual" if passthru is True else "iteration") == "individual"
     logger.info("single submission type: %s" % single)
 
-    #Do we need the results
+    # Do we need the results
     run_query = False if single else True
-    if not run_query: # check if we need the results anyway
-        run_query = any((i["from"].startswith('dataset_jpath') for i in hysdsio["params"]))
+    if not run_query:  # check if we need the results anyway
+        run_query = any((i["from"].startswith('dataset_jpath')
+                         for i in hysdsio["params"]))
     logger.info("run_query: %s" % run_query)
 
-    #Run the query to get the products; for efficiency, run query only if we need the results
-    results = [{"_id":"Transient Faux-Results"}]
+    # Run the query to get the products; for efficiency, run query only if we need the results
+    results = [{"_id": "Transient Faux-Results"}]
     if run_query:
-        #Scroll product results
+        # Scroll product results
         start_url = "{0}/{1}/_search".format(es_url, es_index)
         scroll_url = "{0}/_search".format(es_url, es_index)
         results = post_scrolled_json_responses(start_url, scroll_url, data=json.dumps(queryobj),
                                                logger=logger, generator=True)
 
-    #What to iterate for submission
-    submission_iterable = [{"_id":"Global Single Submission"}] if single else results
-    #Iterator loop
+    # What to iterate for submission
+    submission_iterable = [
+        {"_id": "Global Single Submission"}] if single else results
+    # Iterator loop
     for item in submission_iterable:
         try:
-            #For single submissions, submit all results as one
+            # For single submissions, submit all results as one
             product = results if single else item
             logger.info("Submitting mozart job for product: %s" % product)
 
@@ -109,9 +123,9 @@ def iterate(component, rule):
             if job_type.startswith('hysds-io-'):
                 job_type = job_type.replace('hysds-io-', '', 1)
             if isinstance(product, dict):
-                job_name="%s-%s" % (job_type, product.get('_id', 'unknown'))
+                job_name = "%s-%s" % (job_type, product.get('_id', 'unknown'))
             else:
-                job_name="%s-single_submission" % job_type
+                job_name = "%s-single_submission" % job_type
 
             # disable dedup for passthru single submissions
             enable_dedup = False if not run_query and single else True
@@ -120,7 +134,8 @@ def iterate(component, rule):
             # override enable_dedup setting from hysdsio
             if 'enable_dedup' in hysdsio:
                 enable_dedup = hysdsio['enable_dedup']
-                logger.info("hysdsio overrided enable_dedup: %s" % enable_dedup)
+                logger.info("hysdsio overrided enable_dedup: %s" %
+                            enable_dedup)
 
             ids.append(submit_mozart_job(product, rule, hysdsio,
                                          job_name=job_name,
@@ -129,8 +144,10 @@ def iterate(component, rule):
             error_count = error_count + 1
             if not str(e) in errors:
                 errors.append(str(e))
-            logger.warning("Failed to submit jobs: {0}:{1}".format(type(e),str(e)))
+            logger.warning(
+                "Failed to submit jobs: {0}:{1}".format(type(e), str(e)))
             logger.warning(traceback.format_exc())
     if error_count > 0:
-        logger.error("Failed to submit: {0} of {1} jobs. {2}".format(error_count,len(list(results))," ".join(errors)))
+        logger.error("Failed to submit: {0} of {1} jobs. {2}".format(
+            error_count, len(list(results)), " ".join(errors)))
         raise Exception("Job Submitter Job failed to submit all actions")

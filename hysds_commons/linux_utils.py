@@ -1,3 +1,10 @@
+from __future__ import unicode_literals
+from __future__ import print_function
+from __future__ import division
+from __future__ import absolute_import
+from builtins import open
+from future import standard_library
+standard_library.install_aliases()
 import re
 from subprocess import check_output, CalledProcessError
 
@@ -10,7 +17,8 @@ DOCKER_RE = re.compile(r'docker')
 def running_in_container():
     """Return True if caller is running in a container instance. False otherwise."""
 
-    with open("/proc/1/cgroup") as f: cgroup = f.read()
+    with open("/proc/1/cgroup") as f:
+        cgroup = f.read()
     return True if DOCKER_RE.search(cgroup) else False
 
 
@@ -20,7 +28,8 @@ def get_gateway_ip():
     out = check_output(["ip", "route", "show", "default", "0.0.0.0/0"])
     match = DEF_GATEWAY_RE.search(out)
     if not match:
-        raise RuntimeError("Failed to extract default gateway from ip route: %s" % out)
+        raise RuntimeError(
+            "Failed to extract default gateway from ip route: %s" % out)
     return match.group(1)
 
 
