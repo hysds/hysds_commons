@@ -1,0 +1,109 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/hysds/hysds_commons/config/job-spec-schema.json",
+  "title": "HySDS job-spec Schema",
+  "description": "Schema for the HySDS job-spec.json.* files",
+  "definitions": {
+    "param": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "destination": {
+          "type": "string",
+          "enum": ["positional", "localize", "context"]
+        }
+      },
+      "required": ["name", "destination"]
+    },
+    "imported_worker_files": {
+      "type": "object",
+      "properties": {
+        "type": ["string", "array"]
+      }
+    },
+    "dependency_image": {
+      "type": "object",
+      "properties": {
+        "container_image_name": {
+          "type": "string"
+        },
+        "container_image_url": {
+          "type": ["string", "null"]
+        },
+        "container_mappings": {
+          "$ref": "#/definitions/imported_worker_files"
+        }
+      },
+      "required": ["container_image_name"]
+    }
+  },
+  "properties": {
+    "command": {
+      "description": "Executable path inside container",
+      "type": "string"
+    },
+    "params": {
+      "description": "list of param objects required to run this job",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/param"
+      }
+    },
+    "imported_worker_files": {
+      "description": "mapping of host file/directory into container",
+      "$ref": "#/definitions/imported_worker_files"
+    },
+    "dependency_images": {
+      "description": "list of dependency image objects",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/dependency_image"
+      }
+    },
+    "recommended-queues": {
+      "description": "list of recommended queues",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "disk_usage": {
+      "description": "minimum free disk usage required to run job specified as '\\d+(GB|MB|KB)', e.g. '100GB, '20MB', '10KB'",
+      "type": "string",
+      "pattern": "[0-9]+(GB|MB|KB)"
+    },
+    "soft_time_limit": {
+      "description": "soft execution time limit in seconds; worker will send a catchable exception to task to allow for cleanup before being killed; effectively a sigterm by the worker to the job; one caveat when determining the soft time limit of your job type: also include time for verdi operations such as docker image loading (on first job), input localization, dataset publishing, triage, etc.",
+      "type": "integer"
+    },
+    "time_limit": {
+      "description": "hard execution time limit in seconds; worker will send an uncatchable exception to the task and will force terminate it; effectively a sigkill by the worker to the job; one caveat when determining the hard time limit of your job type: make sure it's at least 60 seconds greater than the soft_time_limit otherwise job states will be orphaned in figaro",
+      "type": "integer"
+    },
+    "pre": {
+      "description": "list of strings specifying pre-processor functions to run; behavior depends on disable_pre_builtins",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "disable_pre_builtins": {
+      "description": "if set to true, default builtin pre-processors (currently [hysds.utils.localize_urls, hysds.utils.mark_localized_datasets, hysds.utils.validate_checksum_files]) are disabled and would need to be specified in pre to run; if not specified or set to false, list of pre-processors specified by pre is appended after the default builtins",
+      "type": "boolean"
+    },
+    "post": {
+      "description": "list of strings specifying post-processor functions to run; behavior depends on disable_post_builtins",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "disable_post_builtins": {
+      "description": "if set to true, default builtin post-processors (currently [hysds.utils.publish_datasets]) are disabled and would need to be specified in post to run; if not specified or set to false, list of post-processors specified by post is appended after the default builtins",
+      "type": "boolean"
+    }
+  },
+  "required": ["command", "params", "disk_usage", "soft_time_limit", "time_limit"]
+}

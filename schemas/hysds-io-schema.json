@@ -1,0 +1,152 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/hysds/hysds_commons/config/hysds-io-schema.json",
+  "title": "HySDS IO Specification Schema",
+  "description": "Schema for the HySDS IO hysds-io.json.* files",
+  "definitions": {
+    "param": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "description": "parameter name; should match corresponding parameter name in job-spec",
+          "type": "string"
+        },
+        "from": {
+          "description": "value for hard-coded parameter value, submitter for user submitted value, dataset_jpath:<jpath> to extract value from ElasticSearch result using a JPath-like notation",
+          "type": "string",
+          "pattern": "(value|submitter|dataset_jpath\\:.+)"
+        },
+        "value": {
+          "description": "hard-coded parameter value",
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["text", "number", "datetime", "date", "boolean", "enum", "email", "textarea", "region", "container_version", "jobspec_version", "hysdsio_version"]
+        },
+        "default": {
+          "description": "default value to use (must be string even if it's a number)",
+          "type": "string"
+        },
+        "optional": {
+          "description": "parameter is optional and can be left blank",
+          "type": "string"
+        },
+        "placeholder": {
+          "description": "value to use as a hint when displaying the form input",
+          "type": "string"
+        },
+        "enumerables": {
+          "description": "list of string values to enumerate via a dropdown list in the form input",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "lambda": {
+          "description": "a lambda function to process the value during submission",
+          "type": "string",
+          "pattern": "lambda .+\\:.+"
+        },
+        "version_regex": {
+          "description": "regex to use to filter on front component of respective container, job-spec or hysds-io ID; e.g. if type=jobspec_version, version_regex=job-time-series and list of all job-specs IDs in the system is [\"job-time-series:release-20171103\", \"job-hello_world:release-20171103\", job-time-series:master\"], the list will be filtered down to those whose ID matched the regex job-time-series in the front component (string before the first \":\"); in this example the resulting filtered set of release tags/branches will be listed as [\"release-20171103\", \"master\"] in a dropdown box; similar to type=enum and enumerable set to all release tags for a certain job type",
+          "type": "string"
+        }
+      },
+      "required": ["name", "from"],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "from": {
+                "const": "value"
+              }
+            },
+            "required": [
+              "from"
+            ]
+          },
+          "then": {
+            "required": [
+              "value"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "enum"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "enumerables"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "container_version",
+                  "jobspec_version",
+                  "hysdsio_version"
+                ]
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "version_regex"
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "properties": {
+    "component": {
+      "description": "component web interface to display this job type in (tosca or figaro); defaults to tosca",
+      "type": "string",
+      "enum": ["tosca", "figaro"]
+    },
+    "label": {
+      "description": "label to be used when this job type is displayed in web interfaces (tosca and figaro); otherwise it will show an automatically generated label based on the string after the 'hysds.io.json.' of the hysds-io file",
+      "type": "string"
+    },
+    "submission_type": {
+      "description": "specifies if the job should be submitted once per product in query or once per job submission; iteration for a submission of the job for each result in the query or individual for a single submission; defaults to iteration",
+      "type": "string",
+      "enum": ["individual", "iteration"]
+    },
+    "enable_dedup": {
+      "description": "set to true to enable job deduplication; false to disable; defaults to true",
+      "type": "boolean"
+    },
+    "allowed_accounts": {
+      "description": "list of strings specifying account user IDs allowed to run this job type from the web interfaces (tosca and figaro); if not defined, ops account is the only account that can access this job type; if _all is specified in the list, then all users will be able to access this job type",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "params": {
+      "description": "list of matching param objects from job-spec required to run this job",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/param"
+      }
+    }
+  },
+  "required": ["params"]
+}

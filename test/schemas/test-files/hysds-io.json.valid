@@ -1,0 +1,23 @@
+{
+  "label": "Hello World",
+  "submission_type": "iteration",
+  "allowed_accounts": [ "ops" ],
+  "params": [
+    {
+      "name": "test_with_lambda",
+      "from": "dataset_jpath:_source",
+      "lambda": "lambda ds: \"%s/%s\" % ((filter(lambda x: x.startswith('s3://'), ds['urls']) or ds['urls'])[0], ds['metadata']['data_product_name'])"
+    },
+    {
+      "name": "test_dataset_jpath",
+      "from": "dataset_jpath:_source.metadata.data_product_name"
+    },
+    {
+      "name": "test_datetime",
+      "from": "submitter",
+      "type": "datetime",
+      "default": "2019-01-01T00:00:00.000Z",
+      "placeholder": "test date time"
+    }
+  ]
+}
