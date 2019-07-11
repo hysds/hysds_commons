@@ -36,5 +36,15 @@ def test_value():
     assert "is not of type 'integer'" in errors[5].message
 
 
+def test_missing():
+    test_file = os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                             'test-files/job-spec.json.missing')
+    errors = __validate(test_file)
+    assert len(errors) == 3
+    assert "'disk_usage' is a required property" in errors[0].message
+    assert "'soft_time_limit' is a required property" in errors[1].message
+    assert "'time_limit' is a required property" in errors[2].message
+
 test_valid()
 test_value()
+test_missing()
