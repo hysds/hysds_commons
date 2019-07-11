@@ -17,6 +17,11 @@
       "name": "prod_name",
       "from": "value",
       "value": "test name"
+    },
+    {
+      "name": "bad_type",
+      "from": "submitter",
+      "type": "bad_type"
     }
   ]
 }

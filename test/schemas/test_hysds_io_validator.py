@@ -27,10 +27,11 @@ def test_value():
     test_file = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                              'test-files/hysds-io.json.value')
     errors = __validate(test_file)
-    assert len(errors) == 3
+    assert len(errors) == 4
     assert "does not match" in errors[0].message
     assert "does not match" in errors[1].message
     assert "not of type \'string\'" in errors[2].message
+    assert "not one of " in errors[3].message
 
 
 def test_conditional_required():

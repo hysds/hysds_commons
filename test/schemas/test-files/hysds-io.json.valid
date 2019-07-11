@@ -1,5 +1,6 @@
 {
   "label": "Hello World",
+  "component": "tosca",
   "submission_type": "iteration",
   "allowed_accounts": [ "ops" ],
   "params": [
@@ -18,6 +19,13 @@
       "type": "datetime",
       "default": "2019-01-01T00:00:00.000Z",
       "placeholder": "test date time"
+    },
+    {
+      "name": "test_enumerables",
+      "from": "submitter",
+      "type": "enum",
+      "enumerables": ["1", "2", "3"]
     }
-  ]
+  ],
+  "enable_dedup": true
 }
