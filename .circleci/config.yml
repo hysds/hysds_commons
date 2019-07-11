@@ -8,9 +8,9 @@ jobs:
       - run:
           name: Test
           command: |
+            source $HOME/verdi/bin/activate
             yum -y update
             yum -y install gcc
-            source $HOME/verdi/bin/activate
             cp $HOME/verdi/ops/hysds/configs/celery/celeryconfig.py.tmpl $HOME/verdi/ops/hysds/celeryconfig.py
             python setup.py test
 
