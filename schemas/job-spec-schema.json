@@ -105,5 +105,5 @@
       "type": "boolean"
     }
   },
-  "required": ["command", "params"]
+  "required": ["command", "params", "disk_usage", "soft_time_limit", "time_limit"]
 }
