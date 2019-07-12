@@ -9,8 +9,19 @@ jobs:
           name: Test
           command: |
             source $HOME/verdi/bin/activate
+            sudo yum -y update
+            sudo yum -y install gcc
             cp $HOME/verdi/ops/hysds/configs/celery/celeryconfig.py.tmpl $HOME/verdi/ops/hysds/celeryconfig.py
-            python setup.py test
+            pip install -U pytest jsonschema
+            mkdir test-reports
+            pytest --junitxml=test-reports/junit.xml
+
+      - store_test_results:
+          path: test-reports
+
+      - store_artifacts:
+          path: test-reports    
+
 
 workflows:
   version: 2

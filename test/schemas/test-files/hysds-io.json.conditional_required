@@ -1,0 +1,21 @@
+{
+  "label": "Hello World",
+  "submission_type": "iteration",
+  "allowed_accounts": [ "ops" ],
+  "params": [
+    {
+      "name": "test_missing_value_field",
+      "from": "value"
+    },
+    {
+      "name": "test_enum",
+      "from": "submitter",
+      "type": "enum"
+    },
+    {
+      "name": "test_version_regex",
+      "from": "submitter",
+      "type": "jobspec_version"
+    }
+  ]
+}

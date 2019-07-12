@@ -1,0 +1,27 @@
+{
+  "label": "Hello World",
+  "submission_type": "iteration",
+  "allowed_accounts": [ "ops" ],
+  "params": [
+    {
+      "name": "localize_url",
+      "from": "submit"
+    },
+    {
+      "name": "number",
+      "from": "value",
+      "value": 9999,
+      "lambda": "lambda"
+    },
+    {
+      "name": "prod_name",
+      "from": "value",
+      "value": "test name"
+    },
+    {
+      "name": "bad_type",
+      "from": "submitter",
+      "type": "bad_type"
+    }
+  ]
+}
