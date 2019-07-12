@@ -25,6 +25,13 @@
       "from": "submitter",
       "type": "enum",
       "enumerables": ["1", "2", "3"]
+    },
+    {
+      "name": "test",
+      "from": "value",
+      "value": "test_value",
+      "type": "container_version",
+      "version_regex": "release.*"
     }
   ],
   "enable_dedup": true
