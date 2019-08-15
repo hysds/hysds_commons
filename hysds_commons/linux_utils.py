@@ -26,7 +26,7 @@ def get_gateway_ip():
     """Return IP address of default gateway."""
 
     out = check_output(["ip", "route", "show", "default", "0.0.0.0/0"])
-    match = DEF_GATEWAY_RE.search(out)
+    match = DEF_GATEWAY_RE.search(out.decode('utf-8'))
     if not match:
         raise RuntimeError(
             "Failed to extract default gateway from ip route: %s" % out)
