@@ -14,4 +14,7 @@ def test_get_gateway_ip():
     print(in_container)
 
     ip_routes_output = check_output(["ip", "route", "show", "default", "0.0.0.0/0"])
-    assert type(ip_routes_output) == str
+    assert type(ip_routes_output) == bytes
+
+    ip_routes_output_str = ip_routes_output.decode('utf-8')
+    assert type(ip_routes_output_str) == str
