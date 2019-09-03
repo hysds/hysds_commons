@@ -14,7 +14,7 @@
         "from": {
           "description": "value for hard-coded parameter value, submitter for user submitted value, dataset_jpath:<jpath> to extract value from ElasticSearch result using a JPath-like notation",
           "type": "string",
-          "pattern": "(value|submitter|dataset_jpath\\:.+)"
+          "pattern": "(passthrough|value|submitter|dataset_jpath\\:.+)"
         },
         "value": {
           "description": "hard-coded parameter value",
