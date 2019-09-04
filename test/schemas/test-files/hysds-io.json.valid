@@ -32,6 +32,11 @@
       "type": "enum",
       "enumerables": ["1", "2", "3"]
     },
+    { 
+      "name": "test_passthrough",
+      "type": "text",
+      "from": "passthrough"
+    },
     {
       "name": "test",
       "from": "value",
