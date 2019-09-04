@@ -10,6 +10,12 @@
       "lambda": "lambda ds: \"%s/%s\" % ((filter(lambda x: x.startswith('s3://'), ds['urls']) or ds['urls'])[0], ds['metadata']['data_product_name'])"
     },
     {
+      "name":"localize_products",
+      "from":"dataset_jpath:",
+      "type":"text",
+      "lambda" : "lambda met: get_partial_products(met['_id'], get_best_url(met['_source']['urls']), [ met['_id']+'.met.json', met['_id']+'.nc' ])"
+    },
+    {
       "name": "test_dataset_jpath",
       "from": "dataset_jpath:_source.metadata.data_product_name"
     },
