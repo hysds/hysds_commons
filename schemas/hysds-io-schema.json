@@ -30,7 +30,7 @@
         },
         "optional": {
           "description": "parameter is optional and can be left blank",
-          "type": "string"
+          "type": "boolean"
         },
         "placeholder": {
           "description": "value to use as a hint when displaying the form input",
