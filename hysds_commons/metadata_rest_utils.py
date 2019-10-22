@@ -36,7 +36,11 @@ def get_all(es_url, es_index, es_type, query=None, logger=None):
     '''
 
     if query is None:
-        query = {"query": {"match_all": {}}}
+        query = {
+            "query": {
+                "match_all": {}
+            }
+        }
     url = "{0}/{1}/_search".format(es_url, es_index)
     es_url = "{0}/_search".format(es_url)
     return request_utils.post_scrolled_json_responses(url, es_url, data=json.dumps(query), logger=logger)
@@ -55,8 +59,7 @@ def get_by_id(es_url, es_index, es_type, ident, logger=None):
     if ident is None:
         raise Exception("id must be supplied")
     final_url = '{0}/{1}/{2}/{3}'.format(es_url, es_index, es_type, ident)
-    dataset_metadata = request_utils.get_requests_json_response(
-        final_url, logger=logger)
+    dataset_metadata = request_utils.get_requests_json_response(final_url, logger=logger)
     # Navigate around Dataset metadata to get true specification
     ret = dataset_metadata["_source"]
     return ret
