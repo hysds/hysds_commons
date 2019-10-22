@@ -1,8 +1,8 @@
 {
-  "order": 0,
-  "template": "{{ index }}",
-  "settings": {
-    "index.refresh_interval": "5s",
+  "order" : 0,
+  "template" : "{{ index }}",
+  "settings" : {
+    "index.refresh_interval" : "5s",
     "analysis": {
       "analyzer": {
         "default": {
@@ -16,41 +16,37 @@
       }
     }
   },
-  "mappings": {
-    "dynamic_templates": [
-      {
-        "integers": {
-          "match_mapping_type": "long",
-          "mapping": {
-            "type": "integer"
-          }
-        }
-      },
-      {
-        "strings": {
-          "match_mapping_type": "string",
-          "mapping": {
-            "norms": false,
-            "type": "text",
-            "copy_to": "text_fields",
-            "fields": {
-              "keyword": {
-                "type": "keyword",
-                "ignore_above": 256
+  "mappings" : {
+    "_default_" : {
+      "dynamic_templates" : [ {
+        "string_fields" : {
+          "mapping" : {
+            "index" : "analyzed",
+            "omit_norms" : true,
+            "type" : "string",
+            "fields" : {
+              "raw" : {
+                "index" : "not_analyzed",
+                "ignore_above" : 256,
+                "type" : "string"
               }
             }
           },
-          "match": "*"
+          "match_mapping_type" : "string",
+          "match" : "*"
         }
-      }
-    ],
-    "properties": {
+      } ],
+      "_id": {
+        "type": "string",
+        "store": true,
+        "index": "not_analyzed"
+      },
       "_timestamp": {
-        "type": "date",
+        "enabled": true,
         "store": true
       },
-      "text_fields": {
-        "type": "text"
+      "_all" : {
+        "enabled" : true
       }
     }
   }
