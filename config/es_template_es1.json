@@ -1,0 +1,53 @@
+{
+  "order" : 0,
+  "template" : "{{ index }}",
+  "settings" : {
+    "index.refresh_interval" : "5s",
+    "analysis": {
+      "analyzer": {
+        "default": {
+          "filter": [
+            "standard",
+            "lowercase",
+            "word_delimiter"
+          ],
+          "tokenizer": "keyword"
+        }
+      }
+    }
+  },
+  "mappings" : {
+    "_default_" : {
+      "dynamic_templates" : [ {
+        "string_fields" : {
+          "mapping" : {
+            "index" : "analyzed",
+            "omit_norms" : true,
+            "type" : "string",
+            "fields" : {
+              "raw" : {
+                "index" : "not_analyzed",
+                "ignore_above" : 256,
+                "type" : "string"
+              }
+            }
+          },
+          "match_mapping_type" : "string",
+          "match" : "*"
+        }
+      } ],
+      "_id": {
+        "type": "string",
+        "store": true,
+        "index": "not_analyzed"
+      },
+      "_timestamp": {
+        "enabled": true,
+        "store": true
+      },
+      "_all" : {
+        "enabled" : true
+      }
+    }
+  }
+}

@@ -7,7 +7,6 @@
       "analyzer": {
         "default": {
           "filter": [
-            "standard",
             "lowercase",
             "word_delimiter"
           ],

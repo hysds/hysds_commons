@@ -19,13 +19,14 @@ def requests_json_response(method, url, data="{}", ignore_errors=False, auth=Non
     @return: dictionary representing JSON object
     '''
 
+    headers = {"Content-Type": "application/json"}
     try:
         if method == "GET":
             r = requests.get(url, data=data, auth=auth, verify=verify)
         elif method == "POST":
-            r = requests.post(url, data=data, auth=auth, verify=verify)
+            r = requests.post(url, data=data, auth=auth, verify=verify, headers=headers)
         elif method == "DELETE":
-            r = requests.delete(url, auth=auth, verify=verify)
+            r = requests.delete(url, auth=auth, verify=verify, headers=headers)
         else:
             raise Exception(
                 "requests_json_response doesn't support request-method: {0}".format(method))
