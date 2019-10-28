@@ -10,7 +10,8 @@ import requests
 import json
 
 
-def requests_json_response(method, url, data="{}", ignore_errors=False, auth=None, verify=True, logger=None):
+def requests_json_response(method, url, data="{}", ignore_errors=False, auth=None, verify=True, logger=None,
+                           attached_headers=None):
     '''
     Sends a request with supplied data and method
     @param method - "GET" or "POST" method
@@ -19,14 +20,17 @@ def requests_json_response(method, url, data="{}", ignore_errors=False, auth=Non
     @return: dictionary representing JSON object
     '''
 
-    headers = {"Content-Type": "application/json"}
+    # headers = {"Content-Type": "application/json"}
     try:
         if method == "GET":
             r = requests.get(url, data=data, auth=auth, verify=verify)
         elif method == "POST":
-            r = requests.post(url, data=data, auth=auth, verify=verify, headers=headers)
+            if attached_headers:
+                r = requests.post(url, data=data, auth=auth, verify=verify, headers=attached_headers)
+            else:
+                r = requests.post(url, data=data, auth=auth, verify=verify)
         elif method == "DELETE":
-            r = requests.delete(url, auth=auth, verify=verify, headers=headers)
+            r = requests.delete(url, auth=auth, verify=verify)
         else:
             raise Exception(
                 "requests_json_response doesn't support request-method: {0}".format(method))
