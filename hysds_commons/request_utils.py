@@ -17,6 +17,7 @@ def requests_json_response(method, url, data="{}", ignore_errors=False, auth=Non
     @param method - "GET" or "POST" method
     @param url - url to request
     @param data - data to send along with request
+    @param attached_headers - optional headers if you want to pass through
     @return: dictionary representing JSON object
     '''
 
