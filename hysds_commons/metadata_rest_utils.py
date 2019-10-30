@@ -6,6 +6,8 @@ from future import standard_library
 standard_library.install_aliases()
 import requests
 import json
+import elasticsearch
+
 from . import request_utils
 
 
@@ -36,10 +38,16 @@ def get_all(es_url, es_index, es_type, query=None, logger=None):
     '''
 
     if query is None:
-        query = {"query": {"match_all": {}}}
+        query = {
+            "query": {
+                "match_all": {}
+            }
+        }
     url = "{0}/{1}/_search".format(es_url, es_index)
     es_url = "{0}/_search".format(es_url)
-    return request_utils.post_scrolled_json_responses(url, es_url, data=json.dumps(query), logger=logger)
+    headers = {"Content-Type": "application/json"}
+    return request_utils.post_scrolled_json_responses(url, es_url, data=json.dumps(query), logger=logger,
+                                                      attached_headers=headers)
 
 
 def get_by_id(es_url, es_index, es_type, ident, logger=None):
@@ -54,9 +62,17 @@ def get_by_id(es_url, es_index, es_type, ident, logger=None):
 
     if ident is None:
         raise Exception("id must be supplied")
-    final_url = '{0}/{1}/{2}/{3}'.format(es_url, es_index, es_type, ident)
-    dataset_metadata = request_utils.get_requests_json_response(
-        final_url, logger=logger)
+
+    # final_url = '{0}/{1}/{2}/{3}'.format(es_url, es_index, es_type, ident)
+    # dataset_metadata = request_utils.get_requests_json_response(final_url, logger=logger)
+
+    es = elasticsearch.Elasticsearch([es_url])
+    try:
+        dataset_metadata = es.get(index=es_index, doc_type=es_type, id=ident)
+    except elasticsearch.ElasticsearchException as e:
+        logger.error(e)
+        raise Exception("Something went wrong with elasticsearch")
+
     # Navigate around Dataset metadata to get true specification
     ret = dataset_metadata["_source"]
     return ret
@@ -71,10 +87,10 @@ def add_metadata(es_url, es_index, es_type, obj, logger=None):
     @param obj - object for ingestion into ES
     '''
 
-    #data = {"doc_as_upsert": True,"doc":obj}
+    # data = {"doc_as_upsert": True,"doc":obj}
     final_url = "{0}/{1}/{2}/{3}".format(es_url, es_index, es_type, obj["id"])
-    request_utils.requests_json_response(
-        "POST", final_url, json.dumps(obj), logger=logger)
+    headers = {"Content-Type": "application/json"}
+    request_utils.requests_json_response("POST", final_url, json.dumps(obj), logger=logger, attached_headers=headers)
 
 
 def remove_metadata(es_url, es_index, es_type, ident, logger=None):

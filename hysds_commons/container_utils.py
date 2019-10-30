@@ -17,46 +17,46 @@ def get_container_types(es_url, logger=None):
     @param es_url - elasticsearch URL
     @return: list of container ids
     '''
-    return hysds_commons.metadata_rest_utils.get_types(es_url, CONTAINER_INDEX,
-                                                       logger=logger)
+    return hysds_commons.metadata_rest_utils.get_types(es_url, CONTAINER_INDEX, logger=logger)
 
 
-def get_container(es_url, ident, logger=None):
+def get_container(es_url, ident, logger=None, container_type=CONTAINER_TYPE):
     '''
     Get a container (JSON body)
     @param es_url - elasticsearch URL
     @param ident - identity of container
+    @param container_type - mapping type for container index, only _doc type allowed in es7
     @return: dict representing anonymous object of HySDS IO
     '''
-    return hysds_commons.metadata_rest_utils.get_by_id(es_url, CONTAINER_INDEX,
-                                                       CONTAINER_TYPE, ident,
-                                                       logger=logger)
+    return hysds_commons.metadata_rest_utils.get_by_id(es_url, CONTAINER_INDEX, container_type, ident, logger=logger)
 
 
-def add_container(es_url, name, url, version, digest, logger=None):
+def add_container(es_url, name, url, version, digest, logger=None, container_type=CONTAINER_TYPE):
     '''
     Ingests a container into the Mozart ElasticSearch index
     @param es_url - elasticsearch URL
     @param name - name of object for ingestion into ES
     @param url - url of object for ingestion into ES
     @param version - version of object for ingestion into ES
+    @param container_type - mapping type for container index, only _doc type allowed in es7
     @param digest - sha256 digest ID of container image
     '''
-    return hysds_commons.metadata_rest_utils.add_metadata(es_url, CONTAINER_INDEX,
-                                                          CONTAINER_TYPE, {
-                                                              "id": name,
-                                                              "digest": digest,
-                                                              "url": url,
-                                                              "version": version},
+    container_obj = {
+        "id": name,
+        "digest": digest,
+        "url": url,
+        "version": version
+    }
+    return hysds_commons.metadata_rest_utils.add_metadata(es_url, CONTAINER_INDEX, container_type, container_obj,
                                                           logger=logger)
 
 
-def remove_container(es_url, ident, logger=None):
+def remove_container(es_url, ident, logger=None, container_type=CONTAINER_TYPE):
     '''
     Remove a container
     @param es_url - elasticsearch URL
     @param ident - id to delete
+    @param container_type - mapping type for container index, only _doc type allowed in es7
     '''
-    return hysds_commons.metadata_rest_utils.remove_metadata(es_url, CONTAINER_INDEX,
-                                                             CONTAINER_TYPE, ident,
+    return hysds_commons.metadata_rest_utils.remove_metadata(es_url, CONTAINER_INDEX, container_type, ident,
                                                              logger=logger)
