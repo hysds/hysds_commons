@@ -42,6 +42,9 @@
         },
         "container_mappings": {
           "$ref": "#/definitions/imported_worker_files"
+        },
+        "runtime_options": {
+          "$ref": "#/definitions/runtime_options"
         }
       },
       "required": ["container_image_name"]
