@@ -1,0 +1,43 @@
+{
+  "command": "/some/path",
+  "recommended-queues": [ "small-queue" ],
+  "params": [
+    {
+      "name": "test_positional",
+      "destination": "positional"
+    },
+    {
+      "name": "test_localize",
+      "destination": "localize"
+    },
+    {
+      "name": "test_context",
+      "destination": "context"
+    }
+  ],
+  "imported_worker_files": {
+    "$HOME/.netrc": ["/home/ops/.netrc"],
+    "$HOME/.aws": ["/home/ops/.aws", "ro"],
+    "$HOME/project/conf/settings.conf": "/home/ops/project/conf/settings.conf"
+  },
+  "runtime_options": {
+    "gpus": "all"
+  },
+  "dependency_images": [
+    {
+      "container_image_name": "s3://bucket/object",
+      "container_image_url": null,
+      "container_mappings": {
+        "$HOME/.netrc": ["/root/.netrc"],
+        "$HOME/.aws": ["/root/.aws", "ro"]
+      }
+    }
+  ],
+  "disable_pre_builtins": false,
+  "pre": [ "some.python.preprocessor.function" ],
+  "disable_post_builtins": false,
+  "post": [ "hysds.utils.triage" ],
+  "disk_usage": "100KB",
+  "soft_time_limit": 900,
+  "time_limit": 1020
+}
