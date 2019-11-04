@@ -21,7 +21,7 @@
     "$HOME/project/conf/settings.conf": "/home/ops/project/conf/settings.conf"
   },
   "runtime_options": {
-    "gpus": 5
+    "gpus": "all"
   },
   "dependency_images": [
     {
