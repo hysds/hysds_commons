@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://github.com/hysds/hysds_commons/config/job-spec-schema.json",
+  "$id": "https://github.com/hysds/hysds_commons/schemas/job-spec-schema.json",
   "title": "HySDS job-spec Schema",
   "description": "Schema for the HySDS job-spec.json.* files",
   "definitions": {
@@ -16,6 +16,14 @@
         }
       },
       "required": ["name", "destination"]
+    },
+    "runtime_options": {
+      "type": "object",
+      "properties": {
+        "gpus": {
+          "type": ["string", "integer"]
+        }
+      }
     },
     "imported_worker_files": {
       "type": "object",
@@ -34,6 +42,9 @@
         },
         "container_mappings": {
           "$ref": "#/definitions/imported_worker_files"
+        },
+        "runtime_options": {
+          "$ref": "#/definitions/runtime_options"
         }
       },
       "required": ["container_image_name"]
@@ -50,6 +61,10 @@
       "items": {
         "$ref": "#/definitions/param"
       }
+    },
+    "runtime_options": {
+      "description": "mapping of container runtime options",
+      "$ref": "#/definitions/runtime_options"
     },
     "imported_worker_files": {
       "description": "mapping of host file/directory into container",

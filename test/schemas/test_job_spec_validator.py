@@ -1,6 +1,7 @@
 import jsonschema
 import os
 import json
+import logging
 
 schema_file = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                            '../../schemas/job-spec-schema.json')
@@ -44,6 +45,23 @@ def test_missing():
     assert "'disk_usage' is a required property" in errors[0].message
     assert "'soft_time_limit' is a required property" in errors[1].message
     assert "'time_limit' is a required property" in errors[2].message
+
+
+def test_gpus():
+    test_file = os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                             'test-files/job-spec.json.gpus')
+    errors = __validate(test_file)
+    logging.info(errors)
+    assert len(errors) == 0
+
+
+def test_gpus_dependency_image():
+    test_file = os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                             'test-files/job-spec.json.gpus-dep_img')
+    errors = __validate(test_file)
+    logging.info(errors)
+    assert len(errors) == 0
+
 
 test_valid()
 test_value()

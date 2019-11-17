@@ -413,6 +413,9 @@ def resolve_hysds_job(job_type=None, queue=None, priority=None, tags=None,
     # add docker value overlays
     overlays = specification.get("imported_worker_files", {})
 
+    # get runtime options
+    runtime_options = specification.get("runtime_options", {})
+
     # get hard/soft time limits and override if specified
     if time_limit is None:
         time_limit = specification.get('time_limit', None)
@@ -426,6 +429,7 @@ def resolve_hysds_job(job_type=None, queue=None, priority=None, tags=None,
         "container_image_url": container_spec.get("url", None),
         "container_image_name": container_spec.get("id", None),
         "container_mappings": overlays,
+        "runtime_options": runtime_options,
         "time_limit": time_limit,
         "soft_time_limit": soft_time_limit,
         "enable_dedup": enable_dedup,
