@@ -14,6 +14,7 @@ import logging
 from hysds_commons.request_utils import post_scrolled_json_responses
 from hysds_commons.hysds_io_utils import get_hysds_io
 from hysds_commons.job_utils import submit_mozart_job
+from hysds_commons.elasticsearch_utils import get_es_scrolled_data
 
 from hysds.celery import app
 
@@ -103,11 +104,12 @@ def iterate(component, rule):
     results = [{"_id": "Transient Faux-Results"}]
     if run_query:
         # Scroll product results
-        start_url = "{0}/{1}/_search".format(es_url, es_index)
-        scroll_url = "{0}/_search".format(es_url, es_index)
-        headers = {'Content-Type': 'application/json'}
-        results = post_scrolled_json_responses(start_url, scroll_url, data=json.dumps(queryobj),
-                                               logger=logger, generator=True, attached_headers=headers)
+        # start_url = "{0}/{1}/_search".format(es_url, es_index)
+        # scroll_url = "{0}/_search".format(es_url, es_index)
+        # headers = {'Content-Type': 'application/json'}
+        # results = post_scrolled_json_responses(start_url, scroll_url, data=json.dumps(queryobj),
+        #                                        logger=logger, generator=True, attached_headers=headers)
+        results = get_es_scrolled_data(es_url, es_index, queryobj)
 
     # What to iterate for submission
     submission_iterable = [
