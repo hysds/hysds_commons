@@ -84,7 +84,7 @@ def iterate(component, rule):
         queryobj = {"query": rule["query"]}
 
     # Get wiring
-    hysdsio = get_hysds_io(es_url, rule["job_type"], logger=logger)
+    hysdsio = get_hysds_io(es_url, rule["job_type"], logger=logger, hysds_io_type="_doc")
 
     # Is this a single submission
     passthru = rule.get('passthru_query', False)
@@ -105,8 +105,9 @@ def iterate(component, rule):
         # Scroll product results
         start_url = "{0}/{1}/_search".format(es_url, es_index)
         scroll_url = "{0}/_search".format(es_url, es_index)
+        headers = {'Content-Type': 'application/json'}
         results = post_scrolled_json_responses(start_url, scroll_url, data=json.dumps(queryobj),
-                                               logger=logger, generator=True)
+                                               logger=logger, generator=True, attached_headers=headers)
 
     # What to iterate for submission
     submission_iterable = [
