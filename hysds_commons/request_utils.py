@@ -85,7 +85,7 @@ def post_scrolled_json_responses(url, es_url, generator=False, **kwargs):
         if not url.rstrip("/").endswith("_search"):
             raise Exception(
                 "Scrolling only works on search URLs. {0} incompatible.".format(url))
-        setup_url = url + "?search_type=scan&scroll=10m&size=100"
+        setup_url = url + "?scroll=10m&size=100"  # search_type=scan& removed in ES 7.1
         result = post_requests_json_response(setup_url, **kwargs)
         # Harvest scan-setup
         count = result['hits']['total']
