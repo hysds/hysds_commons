@@ -50,15 +50,16 @@ def get_all(es_url, es_index, es_type, query=None, logger=None):
                                                       attached_headers=headers)
 
 
-def get_by_id(es_url, es_index, es_type, ident, logger=None):
-    '''
+def get_by_id(es_url, es_index, es_type, ident, safe=False, logger=None):
+    """
     Get a spec document by ID
     @param es_url: elastic search url
     @param es_index - index containing id
     @param es_type - index containing type
     @param ident - ID
+    @param safe - returns False if set to True, raises Exception if set to True
     @return: dict representing anonymous object of specifications
-    '''
+    """
 
     if ident is None:
         raise Exception("id must be supplied")
@@ -69,8 +70,17 @@ def get_by_id(es_url, es_index, es_type, ident, logger=None):
     es = elasticsearch.Elasticsearch([es_url])
     try:
         dataset_metadata = es.get(index=es_index, doc_type=es_type, id=ident)
+    except elasticsearch.NotFoundError as e:
+        if logger:
+            logger.error("%s not found in index %s" % (ident, es_index))
+            logger.error(e)
+        if safe:
+            return False
+        else:
+            raise Exception("%s not found in index %s" % (ident, es_index))
     except elasticsearch.ElasticsearchException as e:
-        logger.error(e)
+        if logger:
+            logger.error(e)
         raise Exception("Something went wrong with elasticsearch")
 
     # Navigate around Dataset metadata to get true specification
