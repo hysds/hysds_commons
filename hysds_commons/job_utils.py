@@ -314,7 +314,7 @@ def resolve_mozart_job(product, rule, hysdsio=None, es_hysdsio_url=None, queue=N
         logger.error(message)
         raise RuntimeError(message)
     elif hysdsio is None:
-        hysdsio = get_hysds_io(es_hysdsio_url, rule["job_type"], logger=logger)
+        hysdsio = get_hysds_io(es_hysdsio_url, rule["job_type"], logger=logger, hysds_io_type="_doc")
 
     # initialize job JSON
     job = {
