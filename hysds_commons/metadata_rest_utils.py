@@ -57,7 +57,7 @@ def get_by_id(es_url, es_index, es_type, ident, safe=False, logger=None):
     @param es_index - index containing id
     @param es_type - index containing type
     @param ident - ID
-    @param safe - returns False if set to True, raises Exception if set to True
+    @param safe - returns False if set to True, raises Exception if set to False
     @return: dict representing anonymous object of specifications
     """
 
