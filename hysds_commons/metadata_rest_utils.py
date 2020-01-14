@@ -28,12 +28,11 @@ def get_types(es_url, es_index, logger=None):
     return sorted([result["_id"] for result in results])
 
 
-def get_all(es_url, es_index, es_type, query=None, logger=None):
+def get_all(es_url, es_index, query=None, logger=None):
     '''
     Get all spec documents in ES index
     @param es_url: elastic search url
     @param es_index - index containing id
-    @param es_type - index containing type
     @return: list of all specification docs
     '''
 
@@ -50,12 +49,11 @@ def get_all(es_url, es_index, es_type, query=None, logger=None):
                                                       attached_headers=headers)
 
 
-def get_by_id(es_url, es_index, es_type, ident, safe=False, logger=None):
+def get_by_id(es_url, es_index, ident, safe=False, logger=None):
     """
     Get a spec document by ID
     @param es_url: elastic search url
     @param es_index - index containing id
-    @param es_type - index containing type
     @param ident - ID
     @param safe - returns False if set to True, raises Exception if set to False
     @return: dict representing anonymous object of specifications
@@ -69,7 +67,7 @@ def get_by_id(es_url, es_index, es_type, ident, safe=False, logger=None):
 
     es = elasticsearch.Elasticsearch([es_url])
     try:
-        dataset_metadata = es.get(index=es_index, doc_type=es_type, id=ident)
+        dataset_metadata = es.get(index=es_index, id=ident)
     except elasticsearch.NotFoundError as e:
         if logger:
             logger.error("%s not found in index %s" % (ident, es_index))
@@ -88,29 +86,27 @@ def get_by_id(es_url, es_index, es_type, ident, safe=False, logger=None):
     return ret
 
 
-def add_metadata(es_url, es_index, es_type, obj, logger=None):
+def add_metadata(es_url, es_index, obj, logger=None):
     '''
     Ingests a metadata into the Mozart ElasticSearch index
     @param es_url: elastic search url
     @param es_index - ElasticSearch index to place object into
-    @param es_type - ElasticSearch type to place object into
     @param obj - object for ingestion into ES
     '''
 
     # data = {"doc_as_upsert": True,"doc":obj}
-    final_url = "{0}/{1}/{2}/{3}".format(es_url, es_index, es_type, obj["id"])
+    final_url = "{0}/{1}/{2}/{3}".format(es_url, es_index, obj["id"])
     headers = {"Content-Type": "application/json"}
     request_utils.requests_json_response("POST", final_url, json.dumps(obj), logger=logger, attached_headers=headers)
 
 
-def remove_metadata(es_url, es_index, es_type, ident, logger=None):
+def remove_metadata(es_url, es_index, ident, logger=None):
     '''
     Remove a container
     @param es_url: elastic search url
     @param es_index - ElasticSearch index to place object into
-    @param es_type - ElasticSearch type to place object into
     @param ident - id of container to delete
     '''
 
-    final_url = "{0}/{1}/{2}/{3}".format(es_url, es_index, es_type, ident)
+    final_url = "{0}/{1}/{2}/{3}".format(es_url, es_index, ident)
     request_utils.requests_json_response("DELETE", final_url, logger=logger)

@@ -8,7 +8,6 @@ import hysds_commons.metadata_rest_utils
 
 
 CONTAINER_INDEX = "containers"
-CONTAINER_TYPE = "container"
 
 
 def get_container_types(es_url, logger=None):
@@ -20,7 +19,7 @@ def get_container_types(es_url, logger=None):
     return hysds_commons.metadata_rest_utils.get_types(es_url, CONTAINER_INDEX, logger=logger)
 
 
-def get_container(es_url, ident, logger=None, container_type=CONTAINER_TYPE):
+def get_container(es_url, ident, logger=None):
     '''
     Get a container (JSON body)
     @param es_url - elasticsearch URL
@@ -28,10 +27,10 @@ def get_container(es_url, ident, logger=None, container_type=CONTAINER_TYPE):
     @param container_type - mapping type for container index, only _doc type allowed in es7
     @return: dict representing anonymous object of HySDS IO
     '''
-    return hysds_commons.metadata_rest_utils.get_by_id(es_url, CONTAINER_INDEX, container_type, ident, logger=logger)
+    return hysds_commons.metadata_rest_utils.get_by_id(es_url, CONTAINER_INDEX, ident, logger=logger)
 
 
-def add_container(es_url, name, url, version, digest, logger=None, container_type=CONTAINER_TYPE):
+def add_container(es_url, name, url, version, digest, logger=None):
     '''
     Ingests a container into the Mozart ElasticSearch index
     @param es_url - elasticsearch URL
@@ -47,16 +46,14 @@ def add_container(es_url, name, url, version, digest, logger=None, container_typ
         "url": url,
         "version": version
     }
-    return hysds_commons.metadata_rest_utils.add_metadata(es_url, CONTAINER_INDEX, container_type, container_obj,
-                                                          logger=logger)
+    return hysds_commons.metadata_rest_utils.add_metadata(es_url, CONTAINER_INDEX, container_obj, logger=logger)
 
 
-def remove_container(es_url, ident, logger=None, container_type=CONTAINER_TYPE):
+def remove_container(es_url, ident, logger=None):
     '''
     Remove a container
     @param es_url - elasticsearch URL
     @param ident - id to delete
     @param container_type - mapping type for container index, only _doc type allowed in es7
     '''
-    return hysds_commons.metadata_rest_utils.remove_metadata(es_url, CONTAINER_INDEX, container_type, ident,
-                                                             logger=logger)
+    return hysds_commons.metadata_rest_utils.remove_metadata(es_url, CONTAINER_INDEX, ident, logger=logger)
