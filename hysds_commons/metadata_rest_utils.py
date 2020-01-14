@@ -95,7 +95,7 @@ def add_metadata(es_url, es_index, obj, logger=None):
     '''
 
     # data = {"doc_as_upsert": True,"doc":obj}
-    final_url = "{0}/{1}/{2}".format(es_url, es_index, obj["id"])
+    final_url = "{0}/{1}/{2}/{3}".format(es_url, es_index, '_doc', obj["id"])
     headers = {"Content-Type": "application/json"}
     request_utils.requests_json_response("POST", final_url, json.dumps(obj), logger=logger, attached_headers=headers)
 
@@ -108,5 +108,5 @@ def remove_metadata(es_url, es_index, ident, logger=None):
     @param ident - id of container to delete
     '''
 
-    final_url = "{0}/{1}/{2}".format(es_url, es_index, ident)
+    final_url = "{0}/{1}/{2}/{3}".format(es_url, es_index, '_doc', ident)
     request_utils.requests_json_response("DELETE", final_url, logger=logger)
