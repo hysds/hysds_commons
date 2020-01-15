@@ -4,37 +4,39 @@ from __future__ import division
 from __future__ import absolute_import
 from future import standard_library
 standard_library.install_aliases()
-import requests
-import json
-import elasticsearch
 
-from . import request_utils
+import json
+from hysds_commons.elasticsearch_utils import get_es_scrolled_data
+from elasticsearch import Elasticsearch, NotFoundError, ElasticsearchException
+
+# from . import request_utils
 
 
 def get_types(es_url, es_index, logger=None):
-    '''
+    """
     Get the listing of spec IDs from an ES index
     @param es_url: elastic search url
     @param es_index: index to list from
     @return: list of ids from given index
-    '''
+    """
 
-    query = {"query": {"match_all": {}}}
-    url = "{0}/{1}/_search".format(es_url, es_index)
-    es_url = "{0}/_search".format(es_url)
-    data = json.dumps(query)
-    results = request_utils.post_scrolled_json_responses(
-        url, es_url, data=data, logger=logger)
+    query = {
+        "query": {
+            "match_all": {}
+        }
+    }
+    results = get_es_scrolled_data(es_url, es_index, query)
+    logger.info("Received all _id's from index: %s" % es_index)
     return sorted([result["_id"] for result in results])
 
 
 def get_all(es_url, es_index, query=None, logger=None):
-    '''
+    """
     Get all spec documents in ES index
     @param es_url: elastic search url
     @param es_index - index containing id
     @return: list of all specification docs
-    '''
+    """
 
     if query is None:
         query = {
@@ -42,11 +44,10 @@ def get_all(es_url, es_index, query=None, logger=None):
                 "match_all": {}
             }
         }
-    url = "{0}/{1}/_search".format(es_url, es_index)
-    es_url = "{0}/_search".format(es_url)
-    headers = {"Content-Type": "application/json"}
-    return request_utils.post_scrolled_json_responses(url, es_url, data=json.dumps(query), logger=logger,
-                                                      attached_headers=headers)
+    results = get_es_scrolled_data(es_url, es_index, query)
+    logger.info("get_all query: %s" % json.dumps(query, indent=2))
+    logger.info("retrieved all data from index: %s" % es_index)
+    return results
 
 
 def get_by_id(es_url, es_index, ident, safe=False, logger=None):
@@ -62,13 +63,10 @@ def get_by_id(es_url, es_index, ident, safe=False, logger=None):
     if ident is None:
         raise Exception("id must be supplied")
 
-    # final_url = '{0}/{1}/{2}/{3}'.format(es_url, es_index, es_type, ident)
-    # dataset_metadata = request_utils.get_requests_json_response(final_url, logger=logger)
-
-    es = elasticsearch.Elasticsearch([es_url])
+    es = Elasticsearch([es_url])
     try:
         dataset_metadata = es.get(index=es_index, id=ident)
-    except elasticsearch.NotFoundError as e:
+    except NotFoundError as e:
         if safe:
             logger.warning("%s not found in index %s" % (ident, es_index))
             logger.warning(e)
@@ -77,10 +75,10 @@ def get_by_id(es_url, es_index, ident, safe=False, logger=None):
             logger.error("%s not found in index %s" % (ident, es_index))
             logger.error(e)
             raise Exception("%s not found in index %s" % (ident, es_index))
-    except elasticsearch.ElasticsearchException as e:
+    except ElasticsearchException as e:
         if logger:
             logger.error(e)
-        raise Exception("Something went wrong with elasticsearch")
+        raise Exception(e)
 
     # Navigate around Dataset metadata to get true specification
     ret = dataset_metadata["_source"]
@@ -88,26 +86,47 @@ def get_by_id(es_url, es_index, ident, safe=False, logger=None):
 
 
 def add_metadata(es_url, es_index, obj, logger=None):
-    '''
+    """
     Ingests a metadata into the Mozart ElasticSearch index
     @param es_url: elastic search url
     @param es_index - ElasticSearch index to place object into
     @param obj - object for ingestion into ES
-    '''
+    """
+    es = Elasticsearch([es_url])
+    id = obj['id']
+    try:
+        es.index(index=es_index, id=id, body=obj)
+        logger.info("added to index %s: %s" % (es_index, id))
+    except ElasticsearchException as e:
+        logger.error("unable to index document: %s" % id)
+        logger.error(e)
+        raise Exception(e)
 
-    # data = {"doc_as_upsert": True,"doc":obj}
-    final_url = "{0}/{1}/{2}/{3}".format(es_url, es_index, '_doc', obj["id"])
-    headers = {"Content-Type": "application/json"}
-    request_utils.requests_json_response("POST", final_url, json.dumps(obj), logger=logger, attached_headers=headers)
 
-
-def remove_metadata(es_url, es_index, ident, logger=None):
-    '''
+def remove_metadata(es_url, es_index, ident, safe=False, logger=None):
+    """
     Remove a container
     @param es_url: elastic search url
     @param es_index - ElasticSearch index to place object into
     @param ident - id of container to delete
-    '''
+    """
+    if ident is None:
+        raise Exception("id must be supplied")
 
-    final_url = "{0}/{1}/{2}/{3}".format(es_url, es_index, '_doc', ident)
-    request_utils.requests_json_response("DELETE", final_url, logger=logger)
+    es = Elasticsearch([es_url])
+    try:
+        es.delete(index=es_index, id=ident)
+        logger.info("%s deleted from index: %s" % (ident, es_index))
+    except NotFoundError as e:
+        if safe:
+            logger.warning("%s not found in index %s" % (ident, es_index))
+            logger.warning(e)
+            return False
+        else:
+            logger.error("%s not found in index %s" % (ident, es_index))
+            logger.error(e)
+            raise Exception("%s not found in index %s" % (ident, es_index))
+    except ElasticsearchException as e:
+        if logger:
+            logger.error(e)
+        raise Exception(e)
