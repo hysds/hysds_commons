@@ -85,7 +85,7 @@ def iterate(component, rule):
         queryobj = {"query": rule["query"]}
 
     # Get wiring
-    hysdsio = get_hysds_io(es_url, rule["job_type"], logger=logger, hysds_io_type="_doc")
+    hysdsio = get_hysds_io(es_url, rule["job_type"], logger=logger)
 
     # Is this a single submission
     passthru = rule.get('passthru_query', False)
