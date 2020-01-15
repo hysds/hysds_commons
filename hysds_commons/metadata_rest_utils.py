@@ -69,12 +69,13 @@ def get_by_id(es_url, es_index, ident, safe=False, logger=None):
     try:
         dataset_metadata = es.get(index=es_index, id=ident)
     except elasticsearch.NotFoundError as e:
-        if logger:
-            logger.error("%s not found in index %s" % (ident, es_index))
-            logger.error(e)
         if safe:
+            logger.warning("%s not found in index %s" % (ident, es_index))
+            logger.warning(e)
             return False
         else:
+            logger.error("%s not found in index %s" % (ident, es_index))
+            logger.error(e)
             raise Exception("%s not found in index %s" % (ident, es_index))
     except elasticsearch.ElasticsearchException as e:
         if logger:
