@@ -14,6 +14,8 @@ setup(
     include_package_data=True,
     zip_safe=False,
     install_requires=[
-        'requests>=2.7.0', 'future>=0.17.1', "jsonschema>=3.0.1", "requests_aws4auth=0.9"
+        'requests>=2.7.0',
+        'future>=0.17.1',
+        "jsonschema>=3.0.1"
     ]
 )
