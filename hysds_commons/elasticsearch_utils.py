@@ -29,10 +29,10 @@ class ElasticsearchUtility:
                     print("no id provided, Elasticsearch will auto-generate id")
                 result = self.es.index(index=index, body=doc, refresh=refresh)
             if self.logger:
-                self.logger.info("successfully indexed document to index: %s with _id" % index, result.get('_id'))
+                self.logger.info("successfully indexed document to index: %s with _id: %s" % (index, result.get('_id')))
                 self.logger.info(json.dumps(result))
             else:
-                print("successfully indexed document to index: %s with _id" % index, result.get('_id'))
+                print("successfully indexed document to index: %s with _id: %s" % (index, result.get('_id')))
                 print(json.dumps(result))
             return result
         except RequestError as e:
