@@ -3,9 +3,10 @@ from __future__ import print_function
 from __future__ import division
 from __future__ import absolute_import
 from future import standard_library
-standard_library.install_aliases()
-
+import json
 from elasticsearch import Elasticsearch, NotFoundError, RequestsHttpConnection, RequestError, ElasticsearchException
+
+standard_library.install_aliases()
 # from requests_aws4auth import AWS4Auth
 
 
@@ -17,9 +18,21 @@ class ElasticsearchUtility:
         self.es_url = es_url
         self.logger = logger
 
-    def index_document(self, index, doc, refresh=True):
+    def index_document(self, index, doc, _id=None, refresh=False):
         try:
-            result = self.es.index(index=index, body=doc, refresh=refresh)
+            if _id:
+                result = self.es.index(index=index, id=_id, body=doc, refresh=refresh)
+            else:
+                if self.logger:
+                    self.logger.info("no id provided, Elasticsearch will auto-generate id")
+                else:
+                    print("no id provided, Elasticsearch will auto-generate id")
+                result = self.es.index(index=index, body=doc, refresh=refresh)
+            if self.logger:
+                self.logger.info("successfully indexed document to index: %s with _id" % index, result.get('_id'))
+                self.logger.info(json.dumps(result))
+            else:
+                pass
             return result
         except RequestError as e:
             if self.logger:
@@ -35,21 +48,24 @@ class ElasticsearchUtility:
             data = self.es.get(index=index, id=_id)
             if self.logger:
                 self.logger.info("retrieved _id %s from index %s" % (_id, index))
-            if include_source:
-                return data
             else:
-                return data["_source"]
+                print("retrieved _id %s from index %s" % (_id, index))
+            return data if include_source else data["_source"]
         except NotFoundError as e:
             if safe:
                 if self.logger:
-                    self.logger.warning("%s not found in index %s, safe set to True, will not raise error" % (_id, index))
+                    self.logger.warning("%s not found in index %s" % (_id, index))
+                    self.logger.warning("safe set to True, will not raise error")
                     self.logger.warning(e)
+                else:
+                    print("%s not found in index %s" % (_id, index))
+                    print("safe set to True, will not raise error")
+                    print(e)
                 return False
             else:
                 if self.logger:
-                    self.logger.error("%s not found in index %s" % (_id, index))
                     self.logger.error(e)
-                raise ElasticsearchException("%s not found in index %s" % (_id, index))
+                raise ElasticsearchException(e)
         except ElasticsearchException as e:
             if self.logger:
                 self.logger.error(e)
@@ -72,7 +88,7 @@ class ElasticsearchUtility:
                 self.logger.error(e)
             raise ElasticsearchException(e)
 
-        while page_size > 0:
+        while page_size > 0:  # start scrolling
             page = self.es.scroll(scroll_id=sid, scroll='2m')
             sid = page['_scroll_id']  # Update the scroll ID
 
@@ -114,7 +130,7 @@ class ElasticsearchUtility:
             }
             if self.logger:
                 self.es.update(index, id=_id, body=new_doc, refresh=refresh)
-                self.logger.info()
+                self.logger.info("%s: %s updated with new document" % (index, _id))
             return True
         except ElasticsearchException as e:
             if self.logger:
