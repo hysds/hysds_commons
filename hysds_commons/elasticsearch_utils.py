@@ -32,7 +32,8 @@ class ElasticsearchUtility:
                 self.logger.info("successfully indexed document to index: %s with _id" % index, result.get('_id'))
                 self.logger.info(json.dumps(result))
             else:
-                pass
+                print("successfully indexed document to index: %s with _id" % index, result.get('_id'))
+                print(json.dumps(result))
             return result
         except RequestError as e:
             if self.logger:
