@@ -19,6 +19,14 @@ class ElasticsearchUtility:
         self.logger = logger
 
     def index_document(self, index, doc, _id=None, refresh=False):
+        """
+        indexing (adding) document to elasticsearch
+        :param index: str, elasticsearch index
+        :param doc: dict, document body
+        :param _id: str
+        :param refresh: Boolean, True will refresh the index and document will show up immediately
+        :return:
+        """
         try:
             if _id:
                 result = self.es.index(index=index, id=_id, body=doc, refresh=refresh)
@@ -45,6 +53,14 @@ class ElasticsearchUtility:
             raise ElasticsearchException(e)
 
     def get_by_id(self, index, _id, safe=False, include_source=False):
+        """
+        retrieving document from elasticsearch based on _id
+        :param index: str, elasticsearch index
+        :param _id: str
+        :param safe: Boolean, safe=True will not raise exception
+        :param include_source: will return the _source object from the document
+        :return: dict
+        """
         try:
             data = self.es.get(index=index, id=_id)
             if self.logger:
@@ -53,7 +69,7 @@ class ElasticsearchUtility:
                 print("retrieved _id %s from index %s" % (_id, index))
             return data if include_source else data["_source"]
         except NotFoundError as e:
-            if safe:
+            if safe is True:
                 if self.logger:
                     self.logger.warning("%s not found in index %s" % (_id, index))
                     self.logger.warning("safe set to True, will not raise error")
@@ -73,6 +89,12 @@ class ElasticsearchUtility:
             raise Exception(e)
 
     def query(self, index, query):
+        """
+        returns all records returned from a query, through the scroll API
+        :param index: str, elasticsearch index
+        :param query: dict, document body
+        :return: dict
+        """
         documents = []
 
         try:
@@ -98,7 +120,28 @@ class ElasticsearchUtility:
             documents.extend(scroll_document)
         return documents
 
+    def search(self, index, query):
+        """
+        similar to query method but does not scroll
+        should be used for queries expecting only one result (not using the _id field)
+        :param index: str, elasticsearch index
+        :param query: dict, document body
+        :return:
+        """
+        try:
+            result = self.es.search(index=index, body=query)
+            return result
+        except RequestError as e:
+            if self.logger:
+                self.logger.error(e)
+            raise RequestError(e)
+        except ElasticsearchException as e:
+            if self.logger:
+                self.logger.error(e)
+            raise ElasticsearchException(e)
+
     def get_count(self, index, query):
+        """returning the count for a given query (warning: ES7 returns max count of 10000)"""
         try:
             data = self.es.count(index=index, body=query)
             return data['count']
@@ -108,6 +151,12 @@ class ElasticsearchUtility:
             raise ElasticsearchException(e)
 
     def delete_by_id(self, index, _id):
+        """
+        TODO: should we add a safe parameter if the user does not want to raise an error if not found
+        :param index: str, elasticsearch index
+        :param _id: str
+        :return: Boolean
+        """
         try:
             if self.logger:
                 self.es.delete(index=index, id=_id)
@@ -124,6 +173,14 @@ class ElasticsearchUtility:
             raise ElasticsearchException(e)
 
     def update_document(self, index, _id, body, refresh=False):
+        """
+        updates elasticsearch document using the update API
+        :param index: str, elasticsearch index
+        :param _id: str
+        :param body: dict
+        :param refresh: Boolean
+        :return: Boolean
+        """
         try:
             new_doc = {
                 'doc_as_upsert': True,
