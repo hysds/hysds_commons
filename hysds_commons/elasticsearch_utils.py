@@ -52,7 +52,7 @@ class ElasticsearchUtility:
                 self.logger.error(e)
             raise ElasticsearchException(e)
 
-    def get_by_id(self, index, _id, safe=False, include_source=False):
+    def get_by_id(self, index, _id, safe=False, include_source=True):
         """
         retrieving document from elasticsearch based on _id
         :param index: str, elasticsearch index
