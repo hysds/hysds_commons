@@ -45,20 +45,20 @@ class ElasticsearchUtility:
             return result
         except RequestError as e:
             if self.logger:
-                self.logger.error("status code 400: bad request to Elasticsearch, please check your document")
+                self.logger.exception("status code 400: bad request to Elasticsearch, please check your document")
             raise RequestError(e)
         except ElasticsearchException as e:
             if self.logger:
-                self.logger.error(e)
+                self.logger.exception(e)
             raise ElasticsearchException(e)
 
-    def get_by_id(self, index, _id, safe=False, include_source=True):
+    def get_by_id(self, index, _id, safe=False, _source=True):
         """
         retrieving document from elasticsearch based on _id
         :param index: str, elasticsearch index
         :param _id: str
         :param safe: Boolean, safe=True will not raise exception
-        :param include_source: will return the _source object from the document
+        :param _source: will return the _source object from the document
         :return: dict
         """
         try:
@@ -67,7 +67,7 @@ class ElasticsearchUtility:
                 self.logger.info("retrieved _id %s from index %s" % (_id, index))
             else:
                 print("retrieved _id %s from index %s" % (_id, index))
-            return data if include_source else data["_source"]
+            return data if _source else data["_source"]
         except NotFoundError as e:
             if safe is True:
                 if self.logger:
@@ -78,10 +78,10 @@ class ElasticsearchUtility:
                     print("%s not found in index %s" % (_id, index))
                     print("safe set to True, will not raise error")
                     print(e)
-                return False
+                return json.loads(e.error)
             else:
                 if self.logger:
-                    self.logger.error(e)
+                    self.logger.exception(e)
                 raise ElasticsearchException(e)
         except ElasticsearchException as e:
             if self.logger:
@@ -104,11 +104,11 @@ class ElasticsearchUtility:
             page_size = page['hits']['total']['value']
         except RequestError as e:
             if self.logger:
-                self.logger.error("status code 400: bad request to Elasticsearch, please check your query")
+                self.logger.exception("status code 400: bad request to Elasticsearch, please check your query")
             raise RequestError(e)
         except ElasticsearchException as e:
             if self.logger:
-                self.logger.error(e)
+                self.logger.exception(e)
             raise ElasticsearchException(e)
 
         while page_size > 0:  # start scrolling
@@ -137,7 +137,7 @@ class ElasticsearchUtility:
             raise RequestError(e)
         except ElasticsearchException as e:
             if self.logger:
-                self.logger.error(e)
+                self.logger.exception(e)
             raise ElasticsearchException(e)
 
     def get_count(self, index, query):
@@ -147,29 +147,42 @@ class ElasticsearchUtility:
             return data['count']
         except ElasticsearchException as e:
             if self.logger:
-                self.logger.error(e)
+                self.logger.exception(e)
             raise ElasticsearchException(e)
 
-    def delete_by_id(self, index, _id):
+    def delete_by_id(self, index, _id, safe=False):
         """
-        TODO: should we add a safe parameter if the user does not want to raise an error if not found
         :param index: str, elasticsearch index
         :param _id: str
+        :param safe: Boolean, safe=True will not raise exception
         :return: Boolean
         """
         try:
+            result = self.es.delete(index=index, id=_id)
             if self.logger:
-                self.es.delete(index=index, id=_id)
-                self.logger('%s successfully deleted from index: %s' % (_id, index))
-            return True
+                self.logger.info('%s successfully deleted from index: %s' % (_id, index))
+            else:
+                print('%s successfully deleted from index: %s' % (_id, index))
+            return result
         except NotFoundError as e:
-            if self.logger:
-                self.logger('%s not found in index: %s' % (_id, index))
-                self.logger.error(e)
-            raise NotFoundError(e)
+            if safe:
+                if self.logger:
+                    self.logger.warning('%s not found in index: %s' % (_id, index))
+                    self.logger.warning("safe set to True, will not raise error")
+                    self.logger.warning(e)
+                else:
+                    print('%s not found in index: %s' % (_id, index))
+                    print("safe set to True, will not raise error")
+                    print(e)
+                return json.loads(e.error)
+            else:
+                if self.logger:
+                    self.logger.error('%s not found in index: %s' % (_id, index))
+                    self.logger.exception(e)
+                raise NotFoundError(e)
         except ElasticsearchException as e:
             if self.logger:
-                self.logger.error(e)
+                self.logger.exception(e)
             raise ElasticsearchException(e)
 
     def update_document(self, index, _id, body, refresh=False):
@@ -186,13 +199,15 @@ class ElasticsearchUtility:
                 'doc_as_upsert': True,
                 'doc': body
             }
+            result = self.es.update(index, id=_id, body=new_doc, refresh=refresh)
             if self.logger:
-                self.es.update(index, id=_id, body=new_doc, refresh=refresh)
                 self.logger.info("%s: %s updated with new document" % (index, _id))
-            return True
+            else:
+                print("%s: %s updated with new document" % (index, _id))
+            return result
         except ElasticsearchException as e:
             if self.logger:
-                self.logger.error(e)
+                self.logger.exception(e)
             raise ElasticsearchException(e)
 
 
