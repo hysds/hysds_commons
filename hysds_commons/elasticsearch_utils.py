@@ -20,8 +20,8 @@ class ElasticsearchUtility:
 
     def index_document(self, index, doc, _id=None, refresh=False):
         """
-        indexing (adding) document to elasticsearch
-        :param index: str, elasticsearch index
+        indexing (adding) document to Elasticsearch
+        :param index: str, Elasticsearch index
         :param doc: dict, document body
         :param _id: str
         :param refresh: Boolean, True will refresh the index and document will show up immediately
@@ -54,8 +54,8 @@ class ElasticsearchUtility:
 
     def get_by_id(self, index, _id, safe=False, _source=True):
         """
-        retrieving document from elasticsearch based on _id
-        :param index: str, elasticsearch index
+        retrieving document from Elasticsearch based on _id
+        :param index: str, Elasticsearch index
         :param _id: str
         :param safe: Boolean, safe=True will not raise exception
         :param _source: will return the _source object from the document
@@ -91,7 +91,7 @@ class ElasticsearchUtility:
     def query(self, index, query):
         """
         returns all records returned from a query, through the scroll API
-        :param index: str, elasticsearch index
+        :param index: str, Elasticsearch index
         :param query: dict, document body
         :return: dict
         """
@@ -124,7 +124,7 @@ class ElasticsearchUtility:
         """
         similar to query method but does not scroll
         should be used for queries expecting only one result (not using the _id field)
-        :param index: str, elasticsearch index
+        :param index: str, Elasticsearch index
         :param query: dict, document body
         :return:
         """
@@ -152,7 +152,7 @@ class ElasticsearchUtility:
 
     def delete_by_id(self, index, _id, safe=False):
         """
-        :param index: str, elasticsearch index
+        :param index: str, Elasticsearch index
         :param _id: str
         :param safe: Boolean, safe=True will not raise exception
         :return: Boolean
@@ -187,8 +187,8 @@ class ElasticsearchUtility:
 
     def update_document(self, index, _id, body, refresh=False):
         """
-        updates elasticsearch document using the update API
-        :param index: str, elasticsearch index
+        updates Elasticsearch document using the update API
+        :param index: str, Elasticsearch index
         :param _id: str
         :param body: dict
         :param refresh: Boolean
@@ -205,6 +205,28 @@ class ElasticsearchUtility:
             else:
                 print("%s: %s updated with new document" % (index, _id))
             return result
+        except ElasticsearchException as e:
+            if self.logger:
+                self.logger.exception(e)
+            raise ElasticsearchException(e)
+
+    def delete_by_query(self, index, query, **kwargs):
+        """
+        Deletes documents matching the provided query.
+        :param index: str, Elasticsearch index
+        :param query: dict, query
+        :param kwargs: additional arguments for delete_by_query
+        :return: result from Elasticsearch
+        """
+        try:
+            if self.logger:
+                self.logger.info("")
+            result = self.es.delete_by_query(index=index, body=query, **kwargs)
+            return result
+        except RequestError as e:
+            if self.logger:
+                self.logger.error(e)
+            raise RequestError(e)
         except ElasticsearchException as e:
             if self.logger:
                 self.logger.exception(e)
