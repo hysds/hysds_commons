@@ -210,18 +210,19 @@ class ElasticsearchUtility:
                 self.logger.exception(e)
             raise ElasticsearchException(e)
 
-    def delete_by_query(self, index, query, **kwargs):
+    def delete_by_query(self, index, **kwargs):
         """
+        https://elasticsearch-py.readthedocs.io/en/master/api.html#elasticsearch.Elasticsearch.delete_by_query
         Deletes documents matching the provided query.
         :param index: str, Elasticsearch index
-        :param query: dict, query
+        param query: dict, query
         :param kwargs: additional arguments for delete_by_query
         :return: result from Elasticsearch
         """
         try:
             if self.logger:
                 self.logger.info("")
-            result = self.es.delete_by_query(index=index, body=query, **kwargs)
+            result = self.es.delete_by_query(index=index, **kwargs)
             return result
         except RequestError as e:
             if self.logger:
