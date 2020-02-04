@@ -59,6 +59,9 @@ def iterate(component, rule):
         queryobj = {
             "query": rule["query"]
         }
+    queryobj = {
+        "query": queryobj  # nesting it once more because
+    }
     logger.info("Elasticsearch queryobj: %s" % json.dumps(queryobj))
 
     # Get wiring
