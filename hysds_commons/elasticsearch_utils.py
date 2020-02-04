@@ -215,7 +215,6 @@ class ElasticsearchUtility:
         https://elasticsearch-py.readthedocs.io/en/master/api.html#elasticsearch.Elasticsearch.delete_by_query
         Deletes documents matching the provided query.
         :param index: str, Elasticsearch index
-        param query: dict, query
         :param kwargs: additional arguments for delete_by_query
         :return: result from Elasticsearch
         """
