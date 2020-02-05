@@ -83,6 +83,7 @@ class ElasticsearchUtility:
                 except:
                     return {
                         'success': False,
+                        'found': False,
                         'status': 404,
                         'message': e.error
                     }
@@ -186,6 +187,7 @@ class ElasticsearchUtility:
                 except:
                     return {
                         'success': False,
+                        'found': False,
                         'status': 404,
                         'message': e.error
                     }
