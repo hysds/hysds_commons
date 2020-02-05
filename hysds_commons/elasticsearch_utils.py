@@ -181,7 +181,14 @@ class ElasticsearchUtility:
                     print('%s not found in index: %s' % (_id, index))
                     print("safe set to True, will not raise error")
                     print(e)
-                return json.loads(e.error)
+                try:
+                    return json.loads(e.error)
+                except:
+                    return {
+                        'success': False,
+                        'status': 404,
+                        'message': e.error
+                    }
             else:
                 if self.logger:
                     self.logger.error('%s not found in index: %s' % (_id, index))
