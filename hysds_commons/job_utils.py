@@ -32,13 +32,13 @@ def get_username():
 
 
 def get_params_for_products_set(wiring, kwargs, passthrough=None, products=None):
-    '''
+    """
     Get parameters for parameters for  set of products
     @param wiring: wiring specification
     @param kwargs: key word arguments from submitter
     @param passthrough: rule containing passthrough arguments
     @param products: a list of products
-    '''
+    """
 
     params = {}
     if products is None:
@@ -51,14 +51,14 @@ def get_params_for_products_set(wiring, kwargs, passthrough=None, products=None)
 
 def get_params_for_submission(wiring, kwargs, passthrough=None, product=None,
                               params=None, aggregate=False):
-    '''
+    """
     Get params for submission for HySDS/Tosca style workflow
     @param wiring - wiring specification
     @param kwargs - arguments from user form
     @param passthrough - rule
     @param product - product
     @param params - existing params
-    '''
+    """
     logger.info("wiring: %s" % json.dumps(wiring, indent=2))
     logger.info("kwargs: %s" % json.dumps(kwargs, indent=2))
     logger.info("passthrough: %s" % json.dumps(passthrough, indent=2))
@@ -84,12 +84,12 @@ def get_params_for_submission(wiring, kwargs, passthrough=None, product=None,
 
 
 def run_type_conversion(wire, val):
-    '''
+    """
     Run a conversion from the input string to a known type
     @param wire: hysds-wiring record
     @param val: value to convert
     @returns: type converted value
-    '''
+    """
     # Unspefied types are text
     param_type = wire.get("type", "text")
     # Unfilled optional parameters get the empty string as a converted type
@@ -106,11 +106,11 @@ def run_type_conversion(wire, val):
 
 
 def run_lambda(wire, val):
-    '''
+    """
     Runs the lambda key as a lambda function with 1 arg, the previous value
     @param wire - wiring spec to check for lambda
     @param val
-    '''
+    """
 
     if "lambda" in wire:
         try:
@@ -133,13 +133,13 @@ def run_lambda(wire, val):
 
 
 def get_inputs(param, kwargs, rule=None, product=None):
-    '''
+    """
     Update parameter to add in a value for the param
     @param param - parameter to update
     @param kwargs - inputs from user form
     @param rule - (optional) rule hit to use to fill pass throughs
     @param product - (optional) product hit for augmenting
-    '''
+    """
 
     # Break out if value is known
     if "value" in param:
@@ -163,11 +163,11 @@ def get_inputs(param, kwargs, rule=None, product=None):
 
 
 def process_xpath(xpath, trigger):
-    '''
+    """
     Process the xpath to extract data from a trigger
     @param xpath - xpath location in trigger
     @param trigger - trigger metadata to extract XPath
-    '''
+    """
 
     ret = trigger
     parts = xpath.replace("xpath.", "").split(".")
@@ -189,11 +189,11 @@ def process_xpath(xpath, trigger):
 
 
 def match_inputs(param, context):
-    '''
+    """
     Update parameter to add in a value for the param
     @param param - parameter to update
     @param context - context of job specification
-    '''
+    """
 
     # Break out if value is known
     if "value" in param:
@@ -215,7 +215,7 @@ def match_inputs(param, context):
 
 
 def fill_localize(value, localize_urls):
-    '''
+    """
     Fill the localize product list. Must handle a value that is one of the following:
         1. A URL as a string, should be wrapped like {"url":stinrg}
         2. An object defining "url". Does not need wrapping
@@ -224,7 +224,7 @@ def fill_localize(value, localize_urls):
     @param value: a list conforming to points 1-3 above
     @param localize_urls: in-out list to append localize object to
            Note: this parameter is modified
-    '''
+    """
     # Check for string that need to be wrapped in
     # localize format
     if isinstance(value, str):
@@ -244,13 +244,13 @@ def fill_localize(value, localize_urls):
 
 
 def route_outputs(param, context, positional, localize_urls):
-    '''
+    """
     Route the input parameters to their destinations
     @param param - parameter specification
     @param context - context object to fill with context-destined items
     @param positional - list to append positional arguments to
     @param localize_urls - list to append localize urls to
-    '''
+    """
 
     destination = param.get("destination", "unknown")
     if destination == "positional":
@@ -264,13 +264,13 @@ def route_outputs(param, context, positional, localize_urls):
 
 
 def get_command_line(command, positional):
-    '''
+    """
     Gets the command line invocation for this submission by
     concatenating the command, and positional arguments
     @param command - command line from job spec
     @param positional - positional arguments
     @return: command strin with args, or None
-    '''
+    """
 
     parts = []
     if not command is None:
@@ -287,14 +287,14 @@ def get_command_line(command, positional):
 
 
 def resolve_mozart_job(product, rule, hysdsio=None, es_hysdsio_url=None, queue=None):
-    '''
+    """
     Resolve Mozart job JSON.
     @param product - product result body
     @param rule - rule specification body
     @param hysdsio - (optional) hysds-io body
     @param es_hysdsio_url - (optional) url to request hysdsio data from
     @param queue - (optional) job queue override
-    '''
+    """
 
     logger.info("rule: %s" % json.dumps(rule, indent=2))
     logger.info("hysdsio: %s" % json.dumps(hysdsio, indent=2))
@@ -314,7 +314,7 @@ def resolve_mozart_job(product, rule, hysdsio=None, es_hysdsio_url=None, queue=N
         logger.error(message)
         raise RuntimeError(message)
     elif hysdsio is None:
-        hysdsio = get_hysds_io(es_hysdsio_url, rule["job_type"], logger=logger, hysds_io_type="_doc")
+        hysdsio = get_hysds_io(es_hysdsio_url, rule["job_type"], logger=logger)
 
     # initialize job JSON
     job = {
@@ -347,15 +347,12 @@ def resolve_mozart_job(product, rule, hysdsio=None, es_hysdsio_url=None, queue=N
     # set enable_dedup setting from hysdsio
     if 'enable_dedup' in hysdsio:
         job['enable_dedup'] = hysdsio['enable_dedup']
-
     return job
 
 
-def resolve_hysds_job(job_type=None, queue=None, priority=None, tags=None,
-                      params=None, job_name=None, payload_hash=None,
-                      enable_dedup=True, username=None, soft_time_limit=None,
-                      time_limit=None):
-    '''
+def resolve_hysds_job(job_type=None, queue=None, priority=None, tags=None, params=None, job_name=None,
+                      payload_hash=None, enable_dedup=True, username=None, soft_time_limit=None, time_limit=None):
+    """
     Resolve HySDS job JSON.
     @param job_type - type of the job spec to go find
     @param queue - queue to submit to
@@ -368,7 +365,7 @@ def resolve_hysds_job(job_type=None, queue=None, priority=None, tags=None,
     @param username - username
     @param soft_time_limit - soft time limit for job execution
     @param time_limit - hard time limit for job execution
-    '''
+    """
 
     # check args
     if job_type is None:
@@ -473,25 +470,24 @@ def resolve_hysds_job(job_type=None, queue=None, priority=None, tags=None,
 
 
 def submit_hysds_job(job):
-    '''
+    """
     Submits a HySDS job via celery
-    @param job_type - type of the job spec to go find
-    @param queue - queue to submit to
-    @param priority - priority of job
-    @param tags - tags for this job
-    @param params - dictionary representing job params
-    '''
-
+    # @param job_type - type of the job spec to go find
+    # @param queue - queue to submit to
+    # @param priority - priority of job
+    # @param tags - tags for this job
+    # @param params - dictionary representing job params
+    """
+    queue = 'jobs_processed'
     logger.info("Submitting job:\n{0}".format(json.dumps(job, indent=2)))
-    res = do_submit_job(job, 'jobs_processed')
+    res = do_submit_job(job, queue)
+    logger.info("submitted job to queue: %s" % queue)
     return res.id
 
 
-def submit_mozart_job(product, rule, hysdsio=None, es_hysdsio_url=None,
-                      queue=None, job_name=None, payload_hash=None,
-                      enable_dedup=None, soft_time_limit=None,
-                      time_limit=None):
-    '''
+def submit_mozart_job(product, rule, hysdsio=None, es_hysdsio_url=None, queue=None, job_name=None, payload_hash=None,
+                      enable_dedup=None, soft_time_limit=None, time_limit=None):
+    """
     Resolve a Mozart job to a HySDS job and submit via celery
     @param product - product result body
     @param rule - rule specification body
@@ -503,16 +499,14 @@ def submit_mozart_job(product, rule, hysdsio=None, es_hysdsio_url=None,
     @param enable_dedup - (optional) flag to enable/disable job dedup; if None resolve from hysdsio
     @param soft_time_limit - (optional) soft time limit for job execution
     @param time_limit - (optional) hard time limit for job execution
-    '''
+    """
 
     # resolve mozart job
     moz_job = resolve_mozart_job(product, rule, hysdsio, es_hysdsio_url, queue)
-    logger.info("resolved mozart job: {}".format(
-        json.dumps(moz_job, indent=2)))
+    logger.info("resolved mozart job: {}".format(json.dumps(moz_job, indent=2)))
 
     # enable dedup; param overrides hysdsio
-    dedup = moz_job.get(
-        'enable_dedup', True) if enable_dedup is None else enable_dedup
+    dedup = moz_job.get('enable_dedup', True) if enable_dedup is None else enable_dedup
 
     # resolve hysds job
     job = resolve_hysds_job(moz_job['type'], moz_job['queue'], moz_job['priority'],

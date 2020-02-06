@@ -150,8 +150,12 @@ class ElasticsearchUtility:
     def get_count(self, index, query):
         """returning the count for a given query (warning: ES7 returns max count of 10000)"""
         try:
-            data = self.es.count(index=index, body=query)
-            return data['count']
+            result = self.es.count(index=index, body=query)
+            if self.logger:
+                self.logger.info('received count from elasticsearch: %s' % json.dumps(result, indent=2))
+            else:
+                print('received count from elasticsearch: %s' % json.dumps(result, indent=2))
+            return result['count']
         except ElasticsearchException as e:
             if self.logger:
                 self.logger.exception(e)
