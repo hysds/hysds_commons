@@ -82,7 +82,6 @@ class ElasticsearchUtility:
                     return json.loads(e.error)
                 except:
                     return {
-                        'success': False,
                         'found': False,
                         'status': 404,
                         'message': e.error
@@ -163,7 +162,7 @@ class ElasticsearchUtility:
         :param index: str, Elasticsearch index
         :param _id: str
         :param safe: Boolean, safe=True will not raise exception
-        :return: Boolean
+        :return: dict, keys '_index', '_id', '_version', 'result' (deleted, not_found)
         """
         try:
             result = self.es.delete(index=index, id=_id)
@@ -186,9 +185,8 @@ class ElasticsearchUtility:
                     return json.loads(e.error)
                 except:
                     return {
-                        'success': False,
-                        'found': False,
-                        'status': 404,
+                        '_index': index,
+                        '_id': _id,
                         'message': e.error
                     }
             else:
