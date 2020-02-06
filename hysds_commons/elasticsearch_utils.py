@@ -78,15 +78,22 @@ class ElasticsearchUtility:
                     print("%s not found in index %s" % (_id, index))
                     print("safe set to True, will not raise error")
                     print(e)
-                return json.loads(e.error)
+                try:
+                    return json.loads(e.error)
+                except:
+                    return {
+                        'found': False,
+                        'status': 404,
+                        'message': e.error
+                    }
             else:
                 if self.logger:
                     self.logger.exception(e)
-                raise ElasticsearchException(e)
+                raise NotFoundError(e)
         except ElasticsearchException as e:
             if self.logger:
                 self.logger.error(e)
-            raise Exception(e)
+            raise ElasticsearchException(e)
 
     def query(self, index, query):
         """
@@ -155,7 +162,7 @@ class ElasticsearchUtility:
         :param index: str, Elasticsearch index
         :param _id: str
         :param safe: Boolean, safe=True will not raise exception
-        :return: Boolean
+        :return: dict, keys '_index', '_id', '_version', 'result' (deleted, not_found)
         """
         try:
             result = self.es.delete(index=index, id=_id)
@@ -174,7 +181,14 @@ class ElasticsearchUtility:
                     print('%s not found in index: %s' % (_id, index))
                     print("safe set to True, will not raise error")
                     print(e)
-                return json.loads(e.error)
+                try:
+                    return json.loads(e.error)
+                except:
+                    return {
+                        '_index': index,
+                        '_id': _id,
+                        'message': e.error
+                    }
             else:
                 if self.logger:
                     self.logger.error('%s not found in index: %s' % (_id, index))
@@ -210,18 +224,18 @@ class ElasticsearchUtility:
                 self.logger.exception(e)
             raise ElasticsearchException(e)
 
-    def delete_by_query(self, index, query, **kwargs):
+    def delete_by_query(self, index, **kwargs):
         """
+        https://elasticsearch-py.readthedocs.io/en/master/api.html#elasticsearch.Elasticsearch.delete_by_query
         Deletes documents matching the provided query.
         :param index: str, Elasticsearch index
-        :param query: dict, query
         :param kwargs: additional arguments for delete_by_query
         :return: result from Elasticsearch
         """
         try:
             if self.logger:
                 self.logger.info("")
-            result = self.es.delete_by_query(index=index, body=query, **kwargs)
+            result = self.es.delete_by_query(index=index, **kwargs)
             return result
         except RequestError as e:
             if self.logger:
