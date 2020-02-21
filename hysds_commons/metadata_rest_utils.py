@@ -9,8 +9,6 @@ import json
 from hysds_commons.elasticsearch_utils import get_es_scrolled_data
 from elasticsearch import Elasticsearch, NotFoundError, ElasticsearchException
 
-# from . import request_utils
-
 
 def get_types(es_url, es_index, logger=None):
     """
