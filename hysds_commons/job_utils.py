@@ -6,12 +6,10 @@ from builtins import dict
 from builtins import int
 from future import standard_library
 standard_library.install_aliases()
+
 import os
 import pwd
 import json
-import traceback
-import types
-import collections
 
 from hysds_commons.job_spec_utils import get_job_spec
 from hysds_commons.hysds_io_utils import get_hysds_io
@@ -20,11 +18,11 @@ from hysds_commons.log_utils import logger
 
 from hysds.celery import app
 from hysds.orchestrator import do_submit_job
+from hysds import mozart_es, grq_es, task_worker
 
 
 def get_username():
     """Get username."""
-
     try:
         return pwd.getpwuid(os.getuid())[0]
     except:
@@ -49,8 +47,7 @@ def get_params_for_products_set(wiring, kwargs, passthrough=None, products=None)
     return params
 
 
-def get_params_for_submission(wiring, kwargs, passthrough=None, product=None,
-                              params=None, aggregate=False):
+def get_params_for_submission(wiring, kwargs, passthrough=None, product=None, params=None, aggregate=False):
     """
     Get params for submission for HySDS/Tosca style workflow
     @param wiring - wiring specification
@@ -286,6 +283,7 @@ def get_command_line(command, positional):
     return ret
 
 
+# TODO: maybe add component (mozart, grq) because hysds_io will live in the same mozart ES
 def resolve_mozart_job(product, rule, hysdsio=None, es_hysdsio_url=None, queue=None):
     """
     Resolve Mozart job JSON.
@@ -379,15 +377,13 @@ def resolve_hysds_job(job_type=None, queue=None, priority=None, tags=None, param
     elif isinstance(params, dict):
         pass
     else:
-        raise RuntimeError(
-            "Invalid arg type 'params': {} {}".format(type(params), params))
+        raise RuntimeError("Invalid arg type 'params': {} {}".format(type(params), params))
 
     # pull mozart job and container specs
-    specification = get_job_spec(app.conf['JOBS_ES_URL'], job_type)
+    specification = get_job_spec(app.conf['JOBS_ES_URL'], job_type)  # TODO: should use ElasticsearchUtility wrapper
     container_id = specification.get("container", None)
     container_spec = get_container(app.conf['JOBS_ES_URL'], container_id)
-    logger.info("Running from: {0} in container: {1}".format(
-        job_type, container_id))
+    logger.info("Running from: {0} in container: {1}".format(job_type, container_id))
 
     # resolve inputs/outputs
     positional = []
@@ -485,6 +481,7 @@ def submit_hysds_job(job):
     return res.id
 
 
+# TODO: maybe add component (mozart, grq) because hysds_io will live in the same mozart ES
 def submit_mozart_job(product, rule, hysdsio=None, es_hysdsio_url=None, queue=None, job_name=None, payload_hash=None,
                       enable_dedup=None, soft_time_limit=None, time_limit=None):
     """

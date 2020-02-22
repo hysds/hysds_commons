@@ -92,7 +92,7 @@ class ElasticsearchUtility:
                 raise NotFoundError(e)
         except ElasticsearchException as e:
             if self.logger:
-                self.logger.error(e)
+                self.logger.exception(e)
             raise ElasticsearchException(e)
 
     def query(self, index, query):
@@ -140,7 +140,7 @@ class ElasticsearchUtility:
             return result
         except RequestError as e:
             if self.logger:
-                self.logger.error(e)
+                self.logger.exception(e)
             raise RequestError(e)
         except ElasticsearchException as e:
             if self.logger:
@@ -195,7 +195,7 @@ class ElasticsearchUtility:
                     }
             else:
                 if self.logger:
-                    self.logger.error('%s not found in index: %s' % (_id, index))
+                    self.logger.exception('%s not found in index: %s' % (_id, index))
                     self.logger.exception(e)
                 raise NotFoundError(e)
         except ElasticsearchException as e:
@@ -243,7 +243,7 @@ class ElasticsearchUtility:
             return result
         except RequestError as e:
             if self.logger:
-                self.logger.error(e)
+                self.logger.exception(e)
             raise RequestError(e)
         except ElasticsearchException as e:
             if self.logger:
