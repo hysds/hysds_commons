@@ -11,14 +11,9 @@ import os
 import pwd
 import json
 
-from hysds_commons.job_spec_utils import get_job_spec
-from hysds_commons.hysds_io_utils import get_hysds_io
-from hysds_commons.container_utils import get_container
 from hysds_commons.log_utils import logger
-
-from hysds.celery import app
 from hysds.orchestrator import do_submit_job
-from hysds import mozart_es, grq_es, task_worker
+from hysds import mozart_es
 
 
 def get_username():
@@ -37,7 +32,6 @@ def get_params_for_products_set(wiring, kwargs, passthrough=None, products=None)
     @param passthrough: rule containing passthrough arguments
     @param products: a list of products
     """
-
     params = {}
     if products is None:
         return params
@@ -137,14 +131,13 @@ def get_inputs(param, kwargs, rule=None, product=None):
     @param rule - (optional) rule hit to use to fill pass throughs
     @param product - (optional) product hit for augmenting
     """
-
-    # Break out if value is known
-    if "value" in param:
+    if "value" in param:  # Break out if value is known
         ret = param["value"]
         return ret
+
     source = param.get("from", "unknown")
-    # Get a value
-    ret = param.get("default_value", None)
+    ret = param.get("default_value", None)  # Get a value
+
     if source == "submitter":
         ret = kwargs.get(param.get("name", "unknown"), None)
     elif source == "passthrough" and not rule is None:
@@ -152,10 +145,10 @@ def get_inputs(param, kwargs, rule=None, product=None):
     elif source.startswith("dataset_jpath:") and not product is None:
         # If we are processing a list of products, create a list for outputs
         ret = process_xpath(source.split(":")[1], product)
+
     # Check value is found
     if ret is None and not product is None and not rule is None:
-        raise RuntimeError("Failed to find '{0}' input from '{1}'".format(
-            param.get("name", "unknown"), source))
+        raise RuntimeError("Failed to find '{0}' input from '{1}'".format(param.get("name", "unknown"), source))
     return ret
 
 
@@ -191,13 +184,12 @@ def match_inputs(param, context):
     @param param - parameter to update
     @param context - context of job specification
     """
-
-    # Break out if value is known
-    if "value" in param:
+    if "value" in param:  # Break out if value is known
         return
+
     source = param.get("source", "unknown")
-    # Get a value
-    param["value"] = param.get("default_value", None)
+    param["value"] = param.get("default_value", None)  # Get a value
+
     if source == "submitter":
         param["value"] = context.get("inputs", {}).get(
             param.get("name", "unknown"), None)
@@ -205,10 +197,10 @@ def match_inputs(param, context):
         param["value"] = context.get(param.get("name"), None)
     elif source.startswith("xpath."):
         param["value"] = process_xpath(source, context.get("trigger", {}))
+
     # Check value is found
     if param["value"] is None:
-        raise RuntimeError("Failed to find '{0}' input from '{1}'".format(
-            param.get("name", "unknown"), source))
+        raise RuntimeError("Failed to find '{0}' input from '{1}'".format(param.get("name", "unknown"), source))
 
 
 def fill_localize(value, localize_urls):
@@ -222,18 +214,15 @@ def fill_localize(value, localize_urls):
     @param localize_urls: in-out list to append localize object to
            Note: this parameter is modified
     """
-    # Check for string that need to be wrapped in
-    # localize format
+    # Check for string that need to be wrapped in localize format
     if isinstance(value, str):
         localize_urls.append({"url": value})
-    # Check for objects that define the "url" field, and if so
-    # they can be passed right in
+    # Check for objects that define the "url" field, and if so they can be passed right in
     elif not getattr(value, "get", None) is None and not value.get("url", None) is None:
         localize_urls.append(value)
     # Other types of objects must throw an error
     elif not getattr(value, "get", None) is None:
-        raise ValueError("Invalid object of type {0} trying to be localized. {1}".format(
-            type(value), value))
+        raise ValueError("Invalid object of type {0} trying to be localized. {1}".format(type(value), value))
     # Handle lists and other iterables by recursing
     else:
         for val in value:
@@ -284,35 +273,37 @@ def get_command_line(command, positional):
 
 
 # TODO: maybe add component (mozart, grq) because hysds_io will live in the same mozart ES
-def resolve_mozart_job(product, rule, hysdsio=None, es_hysdsio_url=None, queue=None):
+def resolve_mozart_job(product, rule, hysdsio=None, queue=None, component=None):
     """
     Resolve Mozart job JSON.
     @param product - product result body
     @param rule - rule specification body
     @param hysdsio - (optional) hysds-io body
-    @param es_hysdsio_url - (optional) url to request hysdsio data from
+    @param component - tosca/grq or mozart/figaro, retrieve hysds_io from ES index (hysds_ios-mozart vs hysds_ios-grq)
     @param queue - (optional) job queue override
     """
 
     logger.info("rule: %s" % json.dumps(rule, indent=2))
     logger.info("hysdsio: %s" % json.dumps(hysdsio, indent=2))
-    logger.info("es_hysdsio_url: %s" % es_hysdsio_url)
+    logger.info("component: %s" % component)
     logger.info("queue: %s" % queue)
 
-    # override queue
-    queue = rule['queue'] if queue is None else queue
+    queue = rule['queue'] if queue is None else queue  # override queue
 
-    # ensure priority is int
-    if rule['priority'] is not None:
+    if rule['priority'] is not None:  # ensure priority is int
         rule["priority"] = int(rule['priority'])
 
     # this is the common data for all jobs, and will be copied for each individual submission
-    if hysdsio is None and es_hysdsio_url is None:
+    if hysdsio is None and component is None:
         message = "[ERROR] Must supply a hysds-io object or a ES-URL to request one"
         logger.error(message)
         raise RuntimeError(message)
     elif hysdsio is None:
-        hysdsio = get_hysds_io(es_hysdsio_url, rule["job_type"], logger=logger)
+        if component.lower() in ('tosca', 'grq'):
+            hysds_io_index = 'hysds_ios-grq'
+        else:
+            hysds_io_index = 'hysds_ios-mozart'
+        hysdsio = mozart_es.get_by_id(hysds_io_index, rule["job_type"], _source=False)
 
     # initialize job JSON
     job = {
@@ -323,24 +314,18 @@ def resolve_mozart_job(product, rule, hysdsio=None, es_hysdsio_url=None, queue=N
         "username": rule.get("username", get_username()),
     }
     rule["name"] = rule["rule_name"]
-    #logger.info("job before get_params_for_submission: %s" % json.dumps(job, indent=2))
 
     # resolve parameters for job JSON
     if not isinstance(product, dict):
         logger.info("Products: %s" % product)
-        params = get_params_for_products_set(
-            hysdsio, json.loads(rule["kwargs"]), rule, product)
+        params = get_params_for_products_set(hysdsio, json.loads(rule["kwargs"]), rule, product)
     else:
         logger.info("Product: %s" % product)
-        params = get_params_for_submission(
-            hysdsio, json.loads(rule["kwargs"]), rule, product)
-    #logger.info("job after get_params_for_submission: %s" % json.dumps(job, indent=2))
-    #logger.info("params from get_params_for_submission: %s" % json.dumps(params, indent=2))
+        params = get_params_for_submission(hysdsio, json.loads(rule["kwargs"]), rule, product)
+
     logger.info("params: %s" % json.dumps(params, indent=2))
 
-    # set params
-    job["params"] = json.dumps(params)
-    #logger.info("job after adding params: %s" % json.dumps(job, indent=2))
+    job["params"] = json.dumps(params)  # set params
 
     # set enable_dedup setting from hysdsio
     if 'enable_dedup' in hysdsio:
@@ -364,8 +349,6 @@ def resolve_hysds_job(job_type=None, queue=None, priority=None, tags=None, param
     @param soft_time_limit - soft time limit for job execution
     @param time_limit - hard time limit for job execution
     """
-
-    # check args
     if job_type is None:
         raise RuntimeError("'type' must be supplied in request")
     if queue is None:
@@ -379,10 +362,10 @@ def resolve_hysds_job(job_type=None, queue=None, priority=None, tags=None, param
     else:
         raise RuntimeError("Invalid arg type 'params': {} {}".format(type(params), params))
 
-    # pull mozart job and container specs
-    specification = get_job_spec(app.conf['JOBS_ES_URL'], job_type)  # TODO: should use ElasticsearchUtility wrapper
+    specification = mozart_es.get_by_id('job_specs', job_type, _source=False)  # pull mozart job and container specs
+
     container_id = specification.get("container", None)
-    container_spec = get_container(app.conf['JOBS_ES_URL'], container_id)
+    container_spec = mozart_es.get_by_id('containers', container_id, _source=False)
     logger.info("Running from: {0} in container: {1}".format(job_type, container_id))
 
     # resolve inputs/outputs
@@ -390,6 +373,7 @@ def resolve_hysds_job(job_type=None, queue=None, priority=None, tags=None, param
     context = {}
     localize_urls = specification.get("localize_urls", [])
     logger.info("params: {}".format(specification.get("params", [])))
+
     for param in specification.get("params", []):
         # TODO: change to "check_inputs"
         # match_inputs(param,context)
@@ -400,14 +384,11 @@ def resolve_hysds_job(job_type=None, queue=None, priority=None, tags=None, param
         param["value"] = params[param["name"]]
         route_outputs(param, context, positional, localize_urls)
 
-    # build command line
-    cmd = get_command_line(specification.get("command", None), positional)
+    cmd = get_command_line(specification.get("command", None), positional)  # build command line
 
-    # add docker value overlays
-    overlays = specification.get("imported_worker_files", {})
+    overlays = specification.get("imported_worker_files", {})  # add docker value overlays
 
-    # get runtime options
-    runtime_options = specification.get("runtime_options", {})
+    runtime_options = specification.get("runtime_options", {})  # get runtime options
 
     # get hard/soft time limits and override if specified
     if time_limit is None:
@@ -443,13 +424,13 @@ def resolve_hysds_job(job_type=None, queue=None, priority=None, tags=None, param
         job["payload_hash"] = payload_hash
     if username is not None:
         job["username"] = username
-    # deserialize tags, if needed
-    if isinstance(tags, (str,)):
+    if isinstance(tags, (str,)):  # deserialize tags, if needed
         tags = json.loads(tags)
     if tags is not None:
         job["tags"] = tags
     if tags is not None and len(tags) > 0:
         job["tag"] = tags[0]
+
     job["payload"]["job_specification"] = specification
     job["payload"]["container_specification"] = container_spec
 
@@ -476,30 +457,32 @@ def submit_hysds_job(job):
     """
     queue = 'jobs_processed'
     logger.info("Submitting job:\n{0}".format(json.dumps(job, indent=2)))
+
     res = do_submit_job(job, queue)
     logger.info("submitted job to queue: %s" % queue)
+
     return res.id
 
 
 # TODO: maybe add component (mozart, grq) because hysds_io will live in the same mozart ES
-def submit_mozart_job(product, rule, hysdsio=None, es_hysdsio_url=None, queue=None, job_name=None, payload_hash=None,
-                      enable_dedup=None, soft_time_limit=None, time_limit=None):
+def submit_mozart_job(product, rule, hysdsio=None, queue=None, job_name=None, payload_hash=None, enable_dedup=None,
+                      soft_time_limit=None, time_limit=None, component=None):
     """
     Resolve a Mozart job to a HySDS job and submit via celery
     @param product - product result body
     @param rule - rule specification body
     @param hysdsio - (optional) hysds-io body
-    @param es_hysdsio_url - (optional) url to request hysdsio data from
     @param queue - (optional) job queue override
     @param job_name - (optional) base job name override
     @param payload_hash - (optional) user-generated payload hash
     @param enable_dedup - (optional) flag to enable/disable job dedup; if None resolve from hysdsio
     @param soft_time_limit - (optional) soft time limit for job execution
     @param time_limit - (optional) hard time limit for job execution
+    @param component - tosca/grq or mozart/figaro, retrieve hysds_io from ES index (hysds_ios-mozart vs hysds_ios-grq)
     """
 
     # resolve mozart job
-    moz_job = resolve_mozart_job(product, rule, hysdsio, es_hysdsio_url, queue)
+    moz_job = resolve_mozart_job(product, rule, hysdsio, queue, component=component)
     logger.info("resolved mozart job: {}".format(json.dumps(moz_job, indent=2)))
 
     # enable dedup; param overrides hysdsio
