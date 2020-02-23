@@ -11,15 +11,15 @@ import json
 import traceback
 import logging
 
-from hysds_commons.hysds_io_utils import get_hysds_io
-from hysds_commons.job_utils import submit_mozart_job
-from hysds_commons.elasticsearch_utils import get_es_scrolled_data
-
 from hysds.celery import app
-
+from hysds import mozart_es, grq_es
+from hysds_commons.job_utils import submit_mozart_job
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger("job-iterator")
+
+HYSDS_IOS_GRQ = app.conf['HYSDS_IOS_GRQ']
+HYSDS_IOS_MOZART = app.conf['HYSDS_IOS_MOZART']
 
 
 def get_component_config(component):
@@ -28,14 +28,12 @@ def get_component_config(component):
     @param component - component 
     """
     if component == "mozart" or component == "figaro":
-        es_url = app.conf["JOBS_ES_URL"]
         query_idx = app.conf["STATUS_ALIAS"]
         facetview_url = app.conf["MOZART_URL"]
     else:  # tosca:
-        es_url = app.conf["GRQ_ES_URL"]
         query_idx = app.conf["DATASET_ALIAS"]
         facetview_url = app.conf["GRQ_URL"]
-    return es_url, query_idx, facetview_url
+    return query_idx, facetview_url
 
 
 def iterate(component, rule):
@@ -44,13 +42,11 @@ def iterate(component, rule):
     @param component - "mozart" or "tosca" where this submission came from
     @param rule - rule containing information for running jobs
     """
-    # Accumulators variables
-    ids = []
+    ids = []  # Accumulators variables
     error_count = 0
     errors = []
 
-    # Read config from "origin"
-    es_url, es_index, ignore1 = get_component_config(component)
+    es_index, ignore1 = get_component_config(component)  # Read config from "origin"
 
     # Read in JSON formatted args and setup passthrough
     if 'query' in rule.get('query', {}):
@@ -64,8 +60,9 @@ def iterate(component, rule):
         }
     logger.info("Elasticsearch queryobj: %s" % json.dumps(queryobj))
 
-    # Get wiring
-    hysdsio = get_hysds_io(es_url, rule["job_type"], logger=logger)
+    # Get hysds_ios wiring
+    hysds_io_index = HYSDS_IOS_MOZART if component in ('mozart', 'figaro') else HYSDS_IOS_GRQ
+    hysdsio = mozart_es.get_by_id(hysds_io_index, rule["job_type"], _source=False)
 
     # Is this a single submission
     passthru = rule.get('passthru_query', False)
@@ -81,7 +78,10 @@ def iterate(component, rule):
     # Run the query to get the products; for efficiency, run query only if we need the results
     results = [{"_id": "Transient Faux-Results"}]
     if run_query:
-        results = get_es_scrolled_data(es_url, es_index, queryobj)
+        if component == "mozart" or component == "figaro":
+            results = mozart_es.query(es_index, queryobj)
+        else:
+            results = grq_es.query(es_index, queryobj)
 
     # What to iterate for submission
     submission_iterable = [{"_id": "Global Single Submission"}] if single else results
@@ -120,6 +120,7 @@ def iterate(component, rule):
                 errors.append(str(e))
             logger.warning("Failed to submit jobs: {0}:{1}".format(type(e), str(e)))
             logger.warning(traceback.format_exc())
+
     if error_count > 0:
         logger.error("Failed to submit: {0} of {1} jobs. {2}".format(
             error_count, len(list(results)), " ".join(errors)))
