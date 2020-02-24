@@ -12,14 +12,15 @@ import traceback
 import logging
 
 from hysds.celery import app
-from hysds import mozart_es, grq_es
+from .elasticsearch_connection import mozart_es, grq_es
+
 from hysds_commons.job_utils import submit_mozart_job
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger("job-iterator")
 
-HYSDS_IOS_GRQ = app.conf['HYSDS_IOS_GRQ']
-HYSDS_IOS_MOZART = app.conf['HYSDS_IOS_MOZART']
+HYSDS_IOS_GRQ = app.conf.get('HYSDS_IOS_GRQ', 'hysds_ios-grq')
+HYSDS_IOS_MOZART = app.conf.get('HYSDS_IOS_MOZART', 'hysds_ios-mozart')
 
 
 def get_component_config(component):

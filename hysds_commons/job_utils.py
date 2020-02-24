@@ -13,7 +13,7 @@ import json
 
 from hysds_commons.log_utils import logger
 from hysds.orchestrator import do_submit_job
-from hysds import mozart_es
+from .elasticsearch_connection import mozart_es, grq_es
 
 
 def get_username():
