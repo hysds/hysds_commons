@@ -272,7 +272,6 @@ def get_command_line(command, positional):
     return ret
 
 
-# TODO: maybe add component (mozart, grq) because hysds_io will live in the same mozart ES
 def resolve_mozart_job(product, rule, hysdsio=None, queue=None, component=None):
     """
     Resolve Mozart job JSON.
@@ -464,7 +463,6 @@ def submit_hysds_job(job):
     return res.id
 
 
-# TODO: maybe add component (mozart, grq) because hysds_io will live in the same mozart ES
 def submit_mozart_job(product, rule, hysdsio=None, queue=None, job_name=None, payload_hash=None, enable_dedup=None,
                       soft_time_limit=None, time_limit=None, component=None):
     """
