@@ -8,6 +8,7 @@ from future import standard_library
 standard_library.install_aliases()
 
 from hysds.celery import app
+from hysds.log_utils import logger
 from .elasticsearch_utils import ElasticsearchUtility
 
 
@@ -21,5 +22,5 @@ raised unexpected: ImportError("cannot import name 'mozart_es' from 'hysds':
 (/export/home/hysdsops/verdi/ops/hysds/hysds/__init__.py)")
 """
 
-mozart_es = ElasticsearchUtility(app.conf['JOBS_ES_URL'])
-grq_es = ElasticsearchUtility(app.conf['GRQ_ES_URL'])
+mozart_es = ElasticsearchUtility(app.conf['JOBS_ES_URL'], logger)
+grq_es = ElasticsearchUtility(app.conf['GRQ_ES_URL'], logger)
