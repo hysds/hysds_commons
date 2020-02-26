@@ -26,12 +26,12 @@ HYSDS_QUEUES = (
 
 
 def get_all_queues(rabbitmq_admin_url):
-    '''
+    """
     List the queues available for job-running
     Note: does not return celery internal queues
     @param rabbitmq_admin_url: RabbitMQ admin URL
     @return: list of queues
-    '''
+    """
 
     try:
         data = get_requests_json_response(

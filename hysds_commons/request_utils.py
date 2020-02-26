@@ -10,20 +10,26 @@ import requests
 import json
 
 
-def requests_json_response(method, url, data="{}", ignore_errors=False, auth=None, verify=True, logger=None):
+def requests_json_response(method, url, data="{}", ignore_errors=False, auth=None, verify=True, logger=None,
+                           attached_headers=None):
     '''
     Sends a request with supplied data and method
     @param method - "GET" or "POST" method
     @param url - url to request
     @param data - data to send along with request
+    @param attached_headers - optional headers if you want to pass through
     @return: dictionary representing JSON object
     '''
 
+    # headers = {"Content-Type": "application/json"}
     try:
         if method == "GET":
             r = requests.get(url, data=data, auth=auth, verify=verify)
         elif method == "POST":
-            r = requests.post(url, data=data, auth=auth, verify=verify)
+            if attached_headers:
+                r = requests.post(url, data=data, auth=auth, verify=verify, headers=attached_headers)
+            else:
+                r = requests.post(url, data=data, auth=auth, verify=verify)
         elif method == "DELETE":
             r = requests.delete(url, auth=auth, verify=verify)
         else:
@@ -79,7 +85,7 @@ def post_scrolled_json_responses(url, es_url, generator=False, **kwargs):
         if not url.rstrip("/").endswith("_search"):
             raise Exception(
                 "Scrolling only works on search URLs. {0} incompatible.".format(url))
-        setup_url = url + "?search_type=scan&scroll=10m&size=100"
+        setup_url = url + "?scroll=10m&size=100"  # search_type=scan& removed in ES 7.1
         result = post_requests_json_response(setup_url, **kwargs)
         # Harvest scan-setup
         count = result['hits']['total']

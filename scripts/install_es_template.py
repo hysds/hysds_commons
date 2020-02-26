@@ -21,8 +21,9 @@ def write_template(es_url, index, tmpl_file):
     with open(tmpl_file) as f:
         tmpl = Template(f.read()).render(index=index)
     tmpl_url = "%s/_template/%s" % (es_url, index)
-    r = requests.delete(tmpl_url)
-    r = requests.put(tmpl_url, data=tmpl)
+    headers = {'Content-Type': 'application/json'}
+    r = requests.delete(tmpl_url, headers=headers)
+    r = requests.put(tmpl_url, data=tmpl, headers=headers)
     r.raise_for_status()
     print(r.json())
     print("Successfully installed template %s at %s." % (index, tmpl_url))
