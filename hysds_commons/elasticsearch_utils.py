@@ -1,0 +1,275 @@
+from __future__ import unicode_literals
+from __future__ import print_function
+from __future__ import division
+from __future__ import absolute_import
+from future import standard_library
+import json
+from elasticsearch import Elasticsearch, NotFoundError, RequestsHttpConnection, RequestError, ElasticsearchException
+
+standard_library.install_aliases()
+# from requests_aws4auth import AWS4Auth
+
+
+class ElasticsearchUtility:
+    def __init__(self, es_url, logger=None, **kwargs):
+        # TODO: ADD AWS AUTHENTICATION
+        # TODO: https://docs.aws.amazon.com/elasticsearch-service/latest/developerguide/es-request-signing.html
+        self.es = Elasticsearch(hosts=[es_url], **kwargs)
+        self.es_url = es_url
+        self.logger = logger
+
+    def index_document(self, index, doc, _id=None, refresh=False):
+        """
+        indexing (adding) document to Elasticsearch
+        :param index: str, Elasticsearch index
+        :param doc: dict, document body
+        :param _id: str
+        :param refresh: Boolean, True will refresh the index and document will show up immediately
+        :return:
+        """
+        try:
+            if _id:
+                result = self.es.index(index=index, id=_id, body=doc, refresh=refresh)
+            else:
+                if self.logger:
+                    self.logger.info("no id provided, Elasticsearch will auto-generate id")
+                else:
+                    print("no id provided, Elasticsearch will auto-generate id")
+                result = self.es.index(index=index, body=doc, refresh=refresh)
+            if self.logger:
+                self.logger.info("successfully indexed document to index: %s with _id: %s" % (index, result.get('_id')))
+                self.logger.info(json.dumps(result))
+            else:
+                print("successfully indexed document to index: %s with _id: %s" % (index, result.get('_id')))
+                print(json.dumps(result))
+            return result
+        except RequestError as e:
+            if self.logger:
+                self.logger.exception("status code 400: bad request to Elasticsearch, please check your document")
+            raise RequestError(e)
+        except ElasticsearchException as e:
+            if self.logger:
+                self.logger.exception(e)
+            raise ElasticsearchException(e)
+
+    def get_by_id(self, index, _id, safe=False, _source=True):
+        """
+        retrieving document from Elasticsearch based on _id
+        :param index: str, Elasticsearch index
+        :param _id: str
+        :param safe: Boolean, safe=True will not raise exception
+        :param _source: will return the _source object from the document
+        :return: dict
+        """
+        try:
+            data = self.es.get(index=index, id=_id)
+            if self.logger:
+                self.logger.info("retrieved _id %s from index %s" % (_id, index))
+            else:
+                print("retrieved _id %s from index %s" % (_id, index))
+            return data if _source else data["_source"]
+        except NotFoundError as e:
+            if safe is True:
+                if self.logger:
+                    self.logger.warning("%s not found in index %s" % (_id, index))
+                    self.logger.warning("safe set to True, will not raise error")
+                    self.logger.warning(e)
+                else:
+                    print("%s not found in index %s" % (_id, index))
+                    print("safe set to True, will not raise error")
+                    print(e)
+                try:
+                    return json.loads(e.error)
+                except:
+                    return {
+                        'found': False,
+                        'status': 404,
+                        'message': e.error
+                    }
+            else:
+                if self.logger:
+                    self.logger.exception(e)
+                raise NotFoundError(e)
+        except ElasticsearchException as e:
+            if self.logger:
+                self.logger.exception(e)
+            raise ElasticsearchException(e)
+
+    def query(self, index, query):
+        """
+        returns all records returned from a query, through the scroll API
+        :param index: str, Elasticsearch index
+        :param query: dict, document body
+        :return: dict
+        """
+        documents = []
+
+        try:
+            page = self.es.search(index=index, scroll='2m', size=100, body=query)
+            sid = page['_scroll_id']
+            documents.extend(page['hits']['hits'])
+            page_size = page['hits']['total']['value']
+        except RequestError as e:
+            if self.logger:
+                self.logger.exception("status code 400: bad request to Elasticsearch, please check your query")
+            raise RequestError(e)
+        except ElasticsearchException as e:
+            if self.logger:
+                self.logger.exception(e)
+            raise ElasticsearchException(e)
+
+        while page_size > 0:  # start scrolling
+            page = self.es.scroll(scroll_id=sid, scroll='2m')
+            sid = page['_scroll_id']  # Update the scroll ID
+
+            scroll_document = page['hits']['hits']
+            page_size = len(scroll_document)  # Get the number of results that we returned in the last scroll
+            documents.extend(scroll_document)
+        return documents
+
+    def search(self, index, query):
+        """
+        similar to query method but does not scroll
+        should be used for queries expecting only one result (not using the _id field)
+        :param index: str, Elasticsearch index
+        :param query: dict, document body
+        :return:
+        """
+        try:
+            result = self.es.search(index=index, body=query)
+            return result
+        except RequestError as e:
+            if self.logger:
+                self.logger.exception(e)
+            raise RequestError(e)
+        except ElasticsearchException as e:
+            if self.logger:
+                self.logger.exception(e)
+            raise ElasticsearchException(e)
+
+    def get_count(self, index, query):
+        """returning the count for a given query (warning: ES7 returns max count of 10000)"""
+        try:
+            result = self.es.count(index=index, body=query)
+            if self.logger:
+                self.logger.info('received count from elasticsearch: %s' % json.dumps(result, indent=2))
+            else:
+                print('received count from elasticsearch: %s' % json.dumps(result, indent=2))
+            return result['count']
+        except ElasticsearchException as e:
+            if self.logger:
+                self.logger.exception(e)
+            raise ElasticsearchException(e)
+
+    def delete_by_id(self, index, _id, safe=False):
+        """
+        :param index: str, Elasticsearch index
+        :param _id: str
+        :param safe: Boolean, safe=True will not raise exception
+        :return: dict, keys '_index', '_id', '_version', 'result' (deleted, not_found)
+        """
+        try:
+            result = self.es.delete(index=index, id=_id)
+            if self.logger:
+                self.logger.info('%s successfully deleted from index: %s' % (_id, index))
+            else:
+                print('%s successfully deleted from index: %s' % (_id, index))
+            return result
+        except NotFoundError as e:
+            if safe:
+                if self.logger:
+                    self.logger.warning('%s not found in index: %s' % (_id, index))
+                    self.logger.warning("safe set to True, will not raise error")
+                    self.logger.warning(e)
+                else:
+                    print('%s not found in index: %s' % (_id, index))
+                    print("safe set to True, will not raise error")
+                    print(e)
+                try:
+                    return json.loads(e.error)
+                except:
+                    return {
+                        '_index': index,
+                        '_id': _id,
+                        'message': e.error
+                    }
+            else:
+                if self.logger:
+                    self.logger.exception('%s not found in index: %s' % (_id, index))
+                    self.logger.exception(e)
+                raise NotFoundError(e)
+        except ElasticsearchException as e:
+            if self.logger:
+                self.logger.exception(e)
+            raise ElasticsearchException(e)
+
+    def update_document(self, index, _id, body, refresh=False):
+        """
+        updates Elasticsearch document using the update API
+        :param index: str, Elasticsearch index
+        :param _id: str
+        :param body: dict
+        :param refresh: Boolean
+        :return: Boolean
+        """
+        try:
+            new_doc = {
+                'doc_as_upsert': True,
+                'doc': body
+            }
+            result = self.es.update(index, id=_id, body=new_doc, refresh=refresh)
+            if self.logger:
+                self.logger.info("%s: %s updated with new document" % (index, _id))
+            else:
+                print("%s: %s updated with new document" % (index, _id))
+            return result
+        except ElasticsearchException as e:
+            if self.logger:
+                self.logger.exception(e)
+            raise ElasticsearchException(e)
+
+    def delete_by_query(self, index, **kwargs):
+        """
+        https://elasticsearch-py.readthedocs.io/en/master/api.html#elasticsearch.Elasticsearch.delete_by_query
+        Deletes documents matching the provided query.
+        :param index: str, Elasticsearch index
+        :param kwargs: additional arguments for delete_by_query
+        :return: result from Elasticsearch
+        """
+        try:
+            if self.logger:
+                self.logger.info("")
+            result = self.es.delete_by_query(index=index, **kwargs)
+            return result
+        except RequestError as e:
+            if self.logger:
+                self.logger.exception(e)
+            raise RequestError(e)
+        except ElasticsearchException as e:
+            if self.logger:
+                self.logger.exception(e)
+            raise ElasticsearchException(e)
+
+
+def get_es_scrolled_data(es_url, index, query):
+    es = Elasticsearch([es_url])
+
+    documents = []
+    page = es.search(index=index, scroll='2m', size=100, body=query)
+
+    sid = page['_scroll_id']
+    documents.extend(page['hits']['hits'])
+    page_size = page['hits']['total']['value']
+
+    # Start scrolling
+    while page_size > 0:
+        page = es.scroll(scroll_id=sid, scroll='2m')
+
+        # Update the scroll ID
+        sid = page['_scroll_id']
+        scroll_document = page['hits']['hits']
+
+        # Get the number of results that we returned in the last scroll
+        page_size = len(scroll_document)
+        documents.extend(scroll_document)
+    return documents
