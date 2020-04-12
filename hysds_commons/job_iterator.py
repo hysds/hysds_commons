@@ -41,7 +41,7 @@ def iterate(component, rule):
     """
     Iterator used to iterate across a query result and submit jobs for every hit
     @param component - "mozart" or "tosca" where this submission came from
-    @param rule - rule containing information for running jobs
+    @param rule - rule containing information for running jobs, note - NOT A USER RULE
     """
     ids = []  # Accumulators variables
     error_count = 0
