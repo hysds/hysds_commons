@@ -6,41 +6,36 @@ from __future__ import absolute_import
 from builtins import open
 from future import standard_library
 standard_library.install_aliases()
+
 import os
-import sys
-import json
-import requests
 from jinja2 import Template
 
-from hysds.celery import app
+from hysds.es_util import get_mozart_es
 
 
-def write_template(es_url, index, tmpl_file):
+mozart_es = get_mozart_es()
+
+
+def write_template(index, tmpl_file):
     """Write template to ES."""
 
     with open(tmpl_file) as f:
         tmpl = Template(f.read()).render(index=index)
-    tmpl_url = "%s/_template/%s" % (es_url, index)
-    headers = {'Content-Type': 'application/json'}
-    r = requests.delete(tmpl_url, headers=headers)
-    r = requests.put(tmpl_url, data=tmpl, headers=headers)
-    r.raise_for_status()
-    print(r.json())
-    print("Successfully installed template %s at %s." % (index, tmpl_url))
+
+    # https://elasticsearch-py.readthedocs.io/en/master/api.html#elasticsearch.client.IndicesClient.delete_template
+    mozart_es.es.indices.delete_template(name=index, ignore=400)
+
+    # https://elasticsearch-py.readthedocs.io/en/master/api.html#elasticsearch.client.IndicesClient.put_template
+    mozart_es.es.indices.put_template(name=index, body=tmpl)
+    print("Successfully installed template %s" % index)
 
 
 if __name__ == "__main__":
-    node = sys.argv[1]
-    if node == "mozart":
-        es_url = app.conf['JOBS_ES_URL']
-        indices = ["containers", "job_specs", "hysds_ios"]
-    elif node == "grq":
-        es_url = app.conf['GRQ_ES_URL']
-        indices = ["hysds_ios"]
-    else:
-        raise RuntimeError("Invalid node: %s" % node)
-    tmpl_file = os.path.normpath(os.path.abspath(os.path.join(
-        os.path.dirname(__file__), '..', 'config', 'es_template.json'
-    )))
+    indices = ("containers", "job_specs", "hysds_ios")
+
+    curr_file = os.path.dirname(__file__)
+    tmpl_file = os.path.abspath(os.path.join(curr_file, '..', 'config', 'es_template.json'))
+    tmpl_file = os.path.normpath(tmpl_file)
+
     for index in indices:
-        write_template(es_url, index, tmpl_file)
+        write_template(index, tmpl_file)
