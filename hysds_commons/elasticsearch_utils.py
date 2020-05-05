@@ -24,6 +24,7 @@ class ElasticsearchUtility:
             body – The document
             id – Document ID
             refresh – If true then refresh the affected shards to make this operation visible to search
+            ignore - will not raise error if status code is specified (ex. 404, [400, 404])
         """
         try:
             result = self.es.index(**kwargs)
@@ -49,6 +50,7 @@ class ElasticsearchUtility:
             allow_no_indices – Ignore if a wildcard expression resolves to no concrete indices (default: false)
             expand_wildcards – Whether wildcard expressions should get expanded to open or closed indices
                 (default: open) Valid choices: open, closed, hidden, none, all Default: open
+            ignore - will not raise error if status code is specified (ex. 404, [400, 404])
         """
         try:
             data = self.es.get(**kwargs)
@@ -146,6 +148,7 @@ class ElasticsearchUtility:
             body – A query to restrict the results specified with the Query DSL (optional)
             index – (required) A comma-separated list of indices to restrict the results
             q – Query in the Lucene query string syntax
+            ignore - will not raise error if status code is specified (ex. 404, [400, 404])
         """
         try:
             result = self.es.count(**kwargs)
@@ -169,6 +172,7 @@ class ElasticsearchUtility:
             id – The document ID
             doc_type – The type of the document
             refresh – If true then refresh the affected shards to make this operation visible to search
+            ignore - will not raise error if status code is specified (ex. 404, [400, 404])
         """
         try:
             if self.logger:
@@ -204,6 +208,7 @@ class ElasticsearchUtility:
             doc_type – The type of the document
             _source – True or false to return the _source field or not, or a list of fields to return
             refresh – If true then refresh the affected shards to make this operation visible to search
+            ignore - will not raise error if status code is specified (ex. 404, [400, 404])
         """
         try:
             if self.logger:
