@@ -3,11 +3,9 @@ from __future__ import print_function
 from __future__ import division
 from __future__ import absolute_import
 from future import standard_library
-import json
 from elasticsearch import Elasticsearch, NotFoundError, RequestError, ElasticsearchException
 
 standard_library.install_aliases()
-# from requests_aws4auth import AWS4Auth
 
 
 class ElasticsearchUtility:
@@ -22,7 +20,7 @@ class ElasticsearchUtility:
         https://elasticsearch-py.readthedocs.io/en/master/api.html#elasticsearch.Elasticsearch.index
             index – (required) The name of the index
             body – The document
-            id – Document ID
+            id – (optional) Document ID, will use ES generated id if not specified
             refresh – If true then refresh the affected shards to make this operation visible to search
             ignore - will not raise error if status code is specified (ex. 404, [400, 404])
         """
