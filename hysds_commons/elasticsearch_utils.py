@@ -77,6 +77,8 @@ class ElasticsearchUtility:
             body – The search definition using the Query DSL
             index – (required) A comma-separated list of index names to search (or aliases)
             _source – True or false to return the _source field or not, or a list of fields to return
+            _source_excludes – A list of fields to exclude from the returned _source field
+            _source_includes – A list of fields to extract and return from the _source field
             q – Query in the Lucene query string syntax
             scroll – Specify how long a consistent view of the index should be maintained for scrolled search
             size – Number of hits to return (default: 10)
@@ -215,10 +217,18 @@ class ElasticsearchUtility:
                 print('update_document **kwargs'.format(dict(**kwargs)))
             result = self.es.update(**kwargs)
             return result
+        except RequestError as e:
+            if self.logger:
+                self.logger.exception(e)
+            else:
+                print(e)
+            raise e
         except ElasticsearchException as e:
             if self.logger:
                 self.logger.exception(e)
-            raise ElasticsearchException(e)
+            else:
+                print(e)
+            raise e
 
 
 # TODO: remove all code that uses this function
