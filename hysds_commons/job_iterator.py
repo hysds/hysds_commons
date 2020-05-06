@@ -65,7 +65,8 @@ def iterate(component, rule):
 
     # Get hysds_ios wiring
     hysds_io_index = HYSDS_IOS_MOZART if component in ('mozart', 'figaro') else HYSDS_IOS_GRQ
-    hysdsio = mozart_es.get_by_id(hysds_io_index, rule["job_type"], _source=False)
+    hysdsio = mozart_es.get_by_id(index=hysds_io_index, id=rule["job_type"])
+    hysdsio = hysdsio['_source']
 
     # Is this a single submission
     passthru = rule.get('passthru_query', False)

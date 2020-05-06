@@ -304,7 +304,8 @@ def resolve_mozart_job(product, rule, hysdsio=None, queue=None, component=None):
             hysds_io_index = 'hysds_ios-grq'
         else:
             hysds_io_index = 'hysds_ios-mozart'
-        hysdsio = mozart_es.get_by_id(hysds_io_index, rule["job_type"], _source=False)
+        hysdsio = mozart_es.get_by_id(index=hysds_io_index, id=rule["job_type"])
+        hysdsio = hysdsio['_source']
 
     # initialize job JSON
     job = {
@@ -363,10 +364,13 @@ def resolve_hysds_job(job_type=None, queue=None, priority=None, tags=None, param
     else:
         raise RuntimeError("Invalid arg type 'params': {} {}".format(type(params), params))
 
-    specification = mozart_es.get_by_id('job_specs', job_type, _source=False)  # pull mozart job and container specs
+    # pull mozart job and container specs
+    specification = mozart_es.get_by_id(index='job_specs', id=job_type)
+    specification = specification['_source']
 
     container_id = specification.get("container", None)
-    container_spec = mozart_es.get_by_id('containers', container_id, _source=False)
+    container_spec = mozart_es.get_by_id(index='containers', id=container_id)
+    container_spec = container_spec['_source']
     logger.info("Running from: {0} in container: {1}".format(job_type, container_id))
 
     # resolve inputs/outputs
