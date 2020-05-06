@@ -83,9 +83,9 @@ def iterate(component, rule):
     results = [{"_id": "Transient Faux-Results"}]
     if run_query:
         if component == "mozart" or component == "figaro":
-            results = mozart_es.query(es_index, queryobj)
+            results = mozart_es.query(index=es_index, body=queryobj)
         else:
-            results = grq_es.query(es_index, queryobj)
+            results = grq_es.query(index=es_index, body=queryobj)
 
     # What to iterate for submission
     submission_iterable = [{"_id": "Global Single Submission"}] if single else results
