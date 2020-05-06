@@ -3,9 +3,9 @@ from __future__ import print_function
 from __future__ import division
 from __future__ import absolute_import
 from future import standard_library
-from elasticsearch import Elasticsearch, NotFoundError, RequestError, ElasticsearchException
-
 standard_library.install_aliases()
+
+from elasticsearch import Elasticsearch, NotFoundError, RequestError, ElasticsearchException
 
 
 class ElasticsearchUtility:
@@ -33,7 +33,7 @@ class ElasticsearchUtility:
             else:
                 print(e)
             raise e
-        except ElasticsearchException as e:
+        except (ElasticsearchException, Exception) as e:
             if self.logger:
                 self.logger.exception(e)
             else:
@@ -51,11 +51,9 @@ class ElasticsearchUtility:
             ignore - will not raise error if status code is specified (ex. 404, [400, 404])
         """
         try:
-            data = self.es.get(**kwargs)
             if self.logger:
                 self.logger.info('get_by_id **kwargs: {}'.format(dict(**kwargs)))
-            else:
-                print('get_by_id **kwargs: {}'.format(dict(**kwargs)))
+            data = self.es.get(**kwargs)
             return data
         except NotFoundError as e:
             if self.logger:
@@ -63,7 +61,7 @@ class ElasticsearchUtility:
             else:
                 print(e)
             raise e
-        except ElasticsearchException as e:
+        except (ElasticsearchException, Exception) as e:
             if self.logger:
                 self.logger.exception(e)
             else:
@@ -84,25 +82,31 @@ class ElasticsearchUtility:
             size – Number of hits to return (default: 10)
             sort – A comma-separated list of <field>:<direction> pairs
         """
-        documents = []
         if 'scroll' not in kwargs:
             kwargs['scroll'] = '2m'
         if 'size' not in kwargs:
             kwargs['size'] = 100
 
-        if self.logger:
-            self.logger.info('query **kwargs: {}'.format(dict(**kwargs)))
-        else:
-            print('query **kwargs: {}'.format(dict(**kwargs)))
+        documents = []
 
         try:
+            if self.logger:
+                self.logger.info('query **kwargs: {}'.format(dict(**kwargs)))
             page = self.es.search(**kwargs)
             sid = page['_scroll_id']
             documents.extend(page['hits']['hits'])
             page_size = page['hits']['total']['value']
-        except NotFoundError as e:
+        except RequestError as e:
+            if self.logger:
+                self.logger.exception(e)
+            else:
+                print(e)
             raise e
-        except ElasticsearchException as e:
+        except (ElasticsearchException, Exception) as e:
+            if self.logger:
+                self.logger.exception(e)
+            else:
+                print(e)
             raise e
 
         if page_size <= len(documents):  # avoid scrolling if we get all data in initial query
@@ -130,15 +134,21 @@ class ElasticsearchUtility:
             sort – A comma-separated list of <field>:<direction> pairs
         """
         try:
+            if self.logger:
+                self.logger.info('search **kwargs: {}'.format(dict(**kwargs)))
             result = self.es.search(**kwargs)
             return result
         except RequestError as e:
             if self.logger:
                 self.logger.exception(e)
+            else:
+                print(e)
             raise e
-        except ElasticsearchException as e:
+        except (ElasticsearchException, Exception) as e:
             if self.logger:
                 self.logger.exception(e)
+            else:
+                print(e)
             raise e
 
     def get_count(self, **kwargs):
@@ -151,13 +161,13 @@ class ElasticsearchUtility:
             ignore - will not raise error if status code is specified (ex. 404, [400, 404])
         """
         try:
+            if self.logger:
+                self.logger.info('get_count **kwargs: {}'.format(dict(**kwargs)))
             result = self.es.count(**kwargs)
             if self.logger:
                 self.logger.info('count: {}'.format(result))
-            else:
-                print('count: {}'.format(result))
             return result['count']
-        except ElasticsearchException as e:
+        except (ElasticsearchException, Exception) as e:
             if self.logger:
                 self.logger.exception(e)
             else:
@@ -170,15 +180,12 @@ class ElasticsearchUtility:
         https://www.elastic.co/guide/en/elasticsearch/reference/master/docs-delete.html
             index – (required) The name of the index
             id – The document ID
-            doc_type – The type of the document
             refresh – If true then refresh the affected shards to make this operation visible to search
             ignore - will not raise error if status code is specified (ex. 404, [400, 404])
         """
         try:
             if self.logger:
                 self.logger.info('query **kwargs: {}'.format(dict(**kwargs)))
-            else:
-                print('query **kwargs: {}'.format(dict(**kwargs)))
             result = self.es.delete(**kwargs)  # index=index, id=_id
             return result
         except NotFoundError as e:
@@ -187,7 +194,7 @@ class ElasticsearchUtility:
             else:
                 print(e)
             raise e
-        except ElasticsearchException as e:
+        except (ElasticsearchException, Exception) as e:
             if self.logger:
                 self.logger.exception(e)
             else:
@@ -205,7 +212,6 @@ class ElasticsearchUtility:
                     "doc_as_upsert": true,
                     "doc": <ES document>
                 }
-            doc_type – The type of the document
             _source – True or false to return the _source field or not, or a list of fields to return
             refresh – If true then refresh the affected shards to make this operation visible to search
             ignore - will not raise error if status code is specified (ex. 404, [400, 404])
@@ -213,8 +219,6 @@ class ElasticsearchUtility:
         try:
             if self.logger:
                 self.logger.info('update_document **kwargs'.format(dict(**kwargs)))
-            else:
-                print('update_document **kwargs'.format(dict(**kwargs)))
             result = self.es.update(**kwargs)
             return result
         except RequestError as e:
@@ -223,7 +227,7 @@ class ElasticsearchUtility:
             else:
                 print(e)
             raise e
-        except ElasticsearchException as e:
+        except (ElasticsearchException, Exception) as e:
             if self.logger:
                 self.logger.exception(e)
             else:
