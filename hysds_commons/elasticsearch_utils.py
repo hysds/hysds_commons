@@ -5,7 +5,8 @@ from __future__ import absolute_import
 from future import standard_library
 standard_library.install_aliases()
 
-from elasticsearch import Elasticsearch, NotFoundError, RequestError, ElasticsearchException
+from elasticsearch import Elasticsearch
+from elasticsearch.exceptions import NotFoundError, RequestError, ElasticsearchException
 
 
 class ElasticsearchUtility:
@@ -51,8 +52,6 @@ class ElasticsearchUtility:
             ignore - will not raise error if status code is specified (ex. 404, [400, 404])
         """
         try:
-            if self.logger:
-                self.logger.info('get_by_id **kwargs: {}'.format(dict(**kwargs)))
             data = self.es.get(**kwargs)
             return data
         except NotFoundError as e:
@@ -71,6 +70,7 @@ class ElasticsearchUtility:
     def query(self, **kwargs):
         """
         returns all records returned from a query, through the scroll API
+
         https://elasticsearch-py.readthedocs.io/en/master/api.html#elasticsearch.Elasticsearch.search
             body – The search definition using the Query DSL
             index – (required) A comma-separated list of index names to search (or aliases)
@@ -81,9 +81,15 @@ class ElasticsearchUtility:
             scroll – Specify how long a consistent view of the index should be maintained for scrolled search
             size – Number of hits to return (default: 10)
             sort – A comma-separated list of <field>:<direction> pairs
+
+        https://elasticsearch-py.readthedocs.io/en/master/api.html#elasticsearch.Elasticsearch.clear_scroll
+            body – A comma-separated list of scroll IDs to clear if none was specified via the scroll_id parameter
+            scroll_id – A comma-separated list of scroll IDs to clear
         """
         if 'scroll' not in kwargs:
             kwargs['scroll'] = '2m'
+        scroll = kwargs['scroll']  # re-use in each subsequent scroll
+
         if 'size' not in kwargs:
             kwargs['size'] = 100
 
@@ -112,13 +118,16 @@ class ElasticsearchUtility:
         if page_size <= len(documents):  # avoid scrolling if we get all data in initial query
             return documents
 
-        while page_size > 0:  # start scrolling
-            page = self.es.scroll(scroll_id=sid, scroll='2m')
-            sid = page['_scroll_id']  # Update the scroll ID
+        while page_size > 0:
+            page = self.es.scroll(scroll_id=sid, scroll=scroll)
             scroll_document = page['hits']['hits']
 
             page_size = len(scroll_document)  # Get the number of results that we returned in the last scroll
             documents.extend(scroll_document)
+
+        # clearing the _scroll_id, Elasticsearch can only keep a finite number of concurrent scroll's (default 500)
+        self.es.clear_scroll(scroll_id=sid)
+
         return documents
 
     def search(self, **kwargs):
@@ -161,11 +170,7 @@ class ElasticsearchUtility:
             ignore - will not raise error if status code is specified (ex. 404, [400, 404])
         """
         try:
-            if self.logger:
-                self.logger.info('get_count **kwargs: {}'.format(dict(**kwargs)))
             result = self.es.count(**kwargs)
-            if self.logger:
-                self.logger.info('count: {}'.format(result))
             return result['count']
         except (ElasticsearchException, Exception) as e:
             if self.logger:
@@ -186,7 +191,7 @@ class ElasticsearchUtility:
         try:
             if self.logger:
                 self.logger.info('query **kwargs: {}'.format(dict(**kwargs)))
-            result = self.es.delete(**kwargs)  # index=index, id=_id
+            result = self.es.delete(**kwargs)
             return result
         except NotFoundError as e:
             if self.logger:
