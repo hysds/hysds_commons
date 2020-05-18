@@ -116,6 +116,7 @@ class ElasticsearchUtility:
             raise e
 
         if page_size <= len(documents):  # avoid scrolling if we get all data in initial query
+            self.es.clear_scroll(scroll_id=sid)
             return documents
 
         while page_size > 0:
