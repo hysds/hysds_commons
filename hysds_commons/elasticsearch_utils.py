@@ -94,12 +94,14 @@ class ElasticsearchUtility:
             kwargs['size'] = 100
 
         documents = []
+        scroll_ids = set()  # unique set of scroll_ids to clear
 
         try:
             if self.logger:
                 self.logger.info('query **kwargs: {}'.format(dict(**kwargs)))
             page = self.es.search(**kwargs)
             sid = page['_scroll_id']
+            scroll_ids.add(sid)
             documents.extend(page['hits']['hits'])
             page_size = page['hits']['total']['value']
         except RequestError as e:
@@ -116,18 +118,22 @@ class ElasticsearchUtility:
             raise e
 
         if page_size <= len(documents):  # avoid scrolling if we get all data in initial query
-            self.es.clear_scroll(scroll_id=sid)
+            for scroll_id in scroll_ids:
+                self.es.clear_scroll(scroll_id=scroll_id)
             return documents
 
         while page_size > 0:
             page = self.es.scroll(scroll_id=sid, scroll=scroll)
             scroll_document = page['hits']['hits']
+            sid = page['_scroll_id']
+            scroll_ids.add(sid)
 
             page_size = len(scroll_document)  # Get the number of results that we returned in the last scroll
             documents.extend(scroll_document)
 
         # clearing the _scroll_id, Elasticsearch can only keep a finite number of concurrent scroll's (default 500)
-        self.es.clear_scroll(scroll_id=sid)
+        for scroll_id in scroll_ids:
+            self.es.clear_scroll(scroll_id=scroll_id)
 
         return documents
 
