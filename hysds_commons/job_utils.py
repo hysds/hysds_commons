@@ -311,6 +311,8 @@ def resolve_mozart_job(product, rule, hysdsio=None, queue=None, component=None):
     job = {
         "queue": queue,
         "priority": rule["priority"],
+        "soft_time_limit": rule.get("soft_time_limit", None),
+        "time_limit": rule.get("time_limit", None),
         "type": hysdsio["job-specification"],
         "tags": json.dumps([rule["rule_name"], hysdsio["id"]]),
         "username": rule.get("username", get_username()),
@@ -485,6 +487,10 @@ def submit_mozart_job(product, rule, hysdsio=None, queue=None, job_name=None, pa
     @param component - tosca/grq or mozart/figaro, retrieve hysds_io from ES index (hysds_ios-mozart vs hysds_ios-grq)
     """
 
+    # raise if using deprecated keywords; TODO: remove in future release
+    if soft_time_limit is not None or time_limit is not None:
+        raise RuntimeError("This parameter is no longer supported. Override these values by passing them in the `rule` param.")
+
     # resolve mozart job
     moz_job = resolve_mozart_job(product, rule, hysdsio, queue, component=component)
     logger.info("resolved mozart job: {}".format(json.dumps(moz_job, indent=2)))
@@ -495,7 +501,7 @@ def submit_mozart_job(product, rule, hysdsio=None, queue=None, job_name=None, pa
     # resolve hysds job
     job = resolve_hysds_job(moz_job['type'], moz_job['queue'], moz_job['priority'],
                             moz_job['tags'], moz_job['params'], job_name, payload_hash,
-                            dedup, moz_job['username'], soft_time_limit, time_limit)
+                            dedup, moz_job['username'], moz_job['soft_time_limit'], moz_job['time_limit'])
     logger.info("resolved HySDS job: {}".format(json.dumps(job, indent=2)))
 
     # submit hysds job
