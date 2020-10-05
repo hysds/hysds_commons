@@ -489,7 +489,8 @@ def submit_mozart_job(product, rule, hysdsio=None, queue=None, job_name=None, pa
 
     # raise if using deprecated keywords; TODO: remove in future release
     if soft_time_limit is not None or time_limit is not None:
-        raise RuntimeError("This parameter is no longer supported. Override these values by passing them in the `rule` param.")
+        raise RuntimeError("This parameter is no longer supported. Override these values by passing them in the `rule` "
+                           "param.")
 
     # resolve mozart job
     moz_job = resolve_mozart_job(product, rule, hysdsio, queue, component=component)
