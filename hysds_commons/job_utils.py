@@ -508,7 +508,8 @@ def submit_mozart_job(product, rule, hysdsio=None, queue=None, job_name=None, pa
     # resolve hysds job
     job = resolve_hysds_job(moz_job['type'], moz_job['queue'], moz_job['priority'],
                             moz_job['tags'], moz_job['params'], job_name, payload_hash,
-                            dedup, moz_job['username'], moz_job['soft_time_limit'], moz_job['time_limit'])
+                            dedup, moz_job['username'], moz_job['soft_time_limit'], moz_job['time_limit'],
+                            moz_job['disk_usage'])
     logger.info("resolved HySDS job: {}".format(json.dumps(job, indent=2)))
 
     # submit hysds job
