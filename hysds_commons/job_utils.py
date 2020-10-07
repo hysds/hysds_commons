@@ -313,6 +313,7 @@ def resolve_mozart_job(product, rule, hysdsio=None, queue=None, component=None):
         "priority": rule["priority"],
         "soft_time_limit": rule.get("soft_time_limit", None),
         "time_limit": rule.get("time_limit", None),
+        "disk_usage": rule.get("disk_usage", None),
         "type": hysdsio["job-specification"],
         "tags": json.dumps([rule["rule_name"], hysdsio["id"]]),
         "username": rule.get("username", get_username()),
@@ -338,7 +339,8 @@ def resolve_mozart_job(product, rule, hysdsio=None, queue=None, component=None):
 
 
 def resolve_hysds_job(job_type=None, queue=None, priority=None, tags=None, params=None, job_name=None,
-                      payload_hash=None, enable_dedup=True, username=None, soft_time_limit=None, time_limit=None):
+                      payload_hash=None, enable_dedup=True, username=None, soft_time_limit=None, time_limit=None,
+                      disk_usage=None):
     """
     Resolve HySDS job JSON.
     @param job_type - type of the job spec to go find
@@ -352,6 +354,7 @@ def resolve_hysds_job(job_type=None, queue=None, priority=None, tags=None, param
     @param username - username
     @param soft_time_limit - soft time limit for job execution
     @param time_limit - hard time limit for job execution
+    @param disk_usage - disk usage for PGE (KB, MB, GB, etc)
     """
     if job_type is None:
         raise RuntimeError("'type' must be supplied in request")
@@ -402,6 +405,8 @@ def resolve_hysds_job(job_type=None, queue=None, priority=None, tags=None, param
         time_limit = specification.get('time_limit', None)
     if soft_time_limit is None:
         soft_time_limit = specification.get('soft_time_limit', None)
+    if disk_usage is None:
+        disk_usage = specification.get('disk_usage', None)
 
     # initialize hysds job JSON
     job = {
@@ -413,6 +418,7 @@ def resolve_hysds_job(job_type=None, queue=None, priority=None, tags=None, param
         "runtime_options": runtime_options,
         "time_limit": time_limit,
         "soft_time_limit": soft_time_limit,
+        "disk_usage": disk_usage,
         "enable_dedup": enable_dedup,
         "payload": {
             "_command": cmd,
@@ -423,8 +429,8 @@ def resolve_hysds_job(job_type=None, queue=None, priority=None, tags=None, param
     # add optional parameters
     if job_name is not None:
         job["job_name"] = job_name
-    if "disk_usage" in specification:
-        job["payload"]["_disk_usage"] = specification.get("disk_usage")
+    if disk_usage is not None:
+        job["payload"]["_disk_usage"] = disk_usage
     if priority is not None:
         job["priority"] = priority
     if payload_hash is not None:
