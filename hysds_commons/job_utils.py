@@ -427,10 +427,9 @@ def resolve_hysds_job(job_type=None, queue=None, priority=None, tags=None, param
     }
 
     # add optional parameters
+    job["payload"]["_disk_usage"] = disk_usage
     if job_name is not None:
         job["job_name"] = job_name
-    if disk_usage is not None:
-        job["payload"]["_disk_usage"] = disk_usage
     if priority is not None:
         job["priority"] = priority
     if payload_hash is not None:
