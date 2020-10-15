@@ -70,9 +70,10 @@ def get_params_for_submission(wiring, kwargs, passthrough=None, product=None, pa
         # Non-aggregated and non-dataset_jpath fields are set once
         elif not wire["name"] in params:
             val = get_inputs(wire, kwargs, passthrough, product)
-            val = run_type_conversion(wire, val)
-            val = run_lambda(wire, val)
-            params[wire["name"]] = val
+            if val is not None:
+                val = run_type_conversion(wire, val)
+                val = run_lambda(wire, val)
+                params[wire["name"]] = val
     return params
 
 
@@ -128,9 +129,9 @@ def run_lambda(wire, val):
 def get_inputs(param, kwargs, rule=None, product=None):
     """
     Update parameter to add in a value for the param
-    @param param - parameter to update
-    @param kwargs - inputs from user form
-    @param rule - (optional) rule hit to use to fill pass throughs
+    @param param - parameter to update (param field in hysds-io)
+    @param kwargs - job param inputs from user form
+    @param rule - (optional) rule hit to use to fill pass through's
     @param product - (optional) product hit for augmenting
     """
     if "value" in param:  # Break out if value is known
@@ -148,8 +149,12 @@ def get_inputs(param, kwargs, rule=None, product=None):
         # If we are processing a list of products, create a list for outputs
         ret = process_xpath(source.split(":")[1], product)
 
+    # if the job param is optional but the value is not set (None/null)
+    if param.get('optional', True) and ret is None:
+        return ret
+
     # Check value is found
-    if ret is None and not product is None and not rule is None:
+    if ret is None and not (product is None) and not (rule is None):
         raise RuntimeError("Failed to find '{0}' input from '{1}'".format(param.get("name", "unknown"), source))
     return ret
 
@@ -377,15 +382,14 @@ def resolve_hysds_job(job_type=None, queue=None, priority=None, tags=None, param
     positional = []
     context = {}
     localize_urls = specification.get("localize_urls", [])
-    logger.info("params: {}".format(specification.get("params", [])))
+    logger.info("job_spec params: {}".format(specification.get("params", [])))
 
     for param in specification.get("params", []):
         # TODO: change to "check_inputs"
         # match_inputs(param,context)
         logger.info("param: {}".format(param))
-        if not param["name"] in params:
-            raise RuntimeError(
-                "'params' must specify '{0}' parameter".format(param["name"]))
+        if param["name"] not in params:
+            raise RuntimeError("'params' must specify '{0}' parameter".format(param["name"]))
         param["value"] = params[param["name"]]
         route_outputs(param, context, positional, localize_urls)
 
