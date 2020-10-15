@@ -150,7 +150,7 @@ def get_inputs(param, kwargs, rule=None, product=None):
         ret = process_xpath(source.split(":")[1], product)
 
     # if the job param is optional but the value is not set (None/null)
-    if param.get('optional', True) and ret is None:
+    if param.get('optional', False) and ret is None:
         return ret
 
     # Check value is found
