@@ -70,10 +70,9 @@ def get_params_for_submission(wiring, kwargs, passthrough=None, product=None, pa
         # Non-aggregated and non-dataset_jpath fields are set once
         elif not wire["name"] in params:
             val = get_inputs(wire, kwargs, passthrough, product)
-            if val is not None:
-                val = run_type_conversion(wire, val)
-                val = run_lambda(wire, val)
-                params[wire["name"]] = val
+            val = run_type_conversion(wire, val)
+            val = run_lambda(wire, val)
+            params[wire["name"]] = val
     return params
 
 
@@ -151,7 +150,7 @@ def get_inputs(param, kwargs, rule=None, product=None):
 
     # if the job param is optional but the value is not set (None/null)
     if param.get('optional', False) and ret is None:
-        return ret
+        return ""
 
     # Check value is found
     if ret is None and not (product is None) and not (rule is None):
