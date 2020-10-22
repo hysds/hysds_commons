@@ -39,7 +39,6 @@ def get_all_queues(rabbitmq_admin_url):
         req.raise_for_status()
 
         data = req.json()
-        data.raise_for_status()
 
     except requests.HTTPError as e:
         if e.response.status_code == 401:
