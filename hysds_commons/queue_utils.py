@@ -4,12 +4,11 @@ from __future__ import division
 from __future__ import absolute_import
 from future import standard_library
 standard_library.install_aliases()
+
 import os
-from requests import HTTPError
+import requests
 
-from hysds_commons.request_utils import get_requests_json_response
 from hysds_commons.log_utils import logger
-
 from hysds.celery import app
 
 
@@ -34,11 +33,16 @@ def get_all_queues(rabbitmq_admin_url):
     """
 
     try:
-        data = get_requests_json_response(
-            os.path.join(rabbitmq_admin_url, "api/queues"))
-    except HTTPError as e:
+        endpoint = os.path.join(rabbitmq_admin_url, "api/queues")
+
+        req = requests.get(endpoint)
+        req.raise_for_status()
+
+        data = req.json()
+        data.raise_for_status()
+
+    except requests.HTTPError as e:
         if e.response.status_code == 401:
-            logger.error("Failed to authenticate to {}. Ensure credentials are set in .netrc.".format(
-                rabbitmq_admin_url))
-        raise
+            logger.error("Failed to authenticate {}. Ensure credentials are set in .netrc".format(rabbitmq_admin_url))
+        raise Exception(e)
     return [obj["name"] for obj in data if not obj["name"].startswith("celery") and obj["name"] not in HYSDS_QUEUES]

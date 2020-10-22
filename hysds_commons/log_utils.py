@@ -4,6 +4,7 @@ from __future__ import division
 from __future__ import absolute_import
 from future import standard_library
 standard_library.install_aliases()
+
 import logging
 
 
@@ -12,4 +13,5 @@ logging.basicConfig(format=log_format, level=logging.INFO)
 logger = logging.getLogger('hysds_commons')
 
 
-def get_logger(): return logger
+def get_logger():
+    return logger

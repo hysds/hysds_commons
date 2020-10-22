@@ -10,10 +10,10 @@ from __future__ import unicode_literals
 from __future__ import print_function
 from __future__ import division
 from __future__ import absolute_import
-
-
 from future import standard_library
 standard_library.install_aliases()
+
+
 def get_best_url(urls, best_prefix=None):
     '''
     Return a single URL starting with the given prefix. If the prefix is None
