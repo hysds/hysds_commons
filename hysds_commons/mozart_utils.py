@@ -6,9 +6,7 @@ from future import standard_library
 standard_library.install_aliases()
 
 import os
-import json
 import requests
-from hysds_commons.request_utils import requests_json_response
 
 
 DEFAULT_MOZART_VERSION = "v0.1"

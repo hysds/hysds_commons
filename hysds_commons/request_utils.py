@@ -6,23 +6,20 @@ from builtins import str
 from future import standard_library
 standard_library.install_aliases()
 
-import traceback
 import requests
-import json
 
 
 def requests_json_response(method, url, data="{}", ignore_errors=False, auth=None, verify=True, logger=None,
                            attached_headers=None):
-    '''
+    """
     Sends a request with supplied data and method
     @param method - "GET" or "POST" method
     @param url - url to request
     @param data - data to send along with request
     @param attached_headers - optional headers if you want to pass through
     @return: dictionary representing JSON object
-    '''
+    """
 
-    # headers = {"Content-Type": "application/json"}
     try:
         if method == "GET":
             r = requests.get(url, data=data, auth=auth, verify=verify)
@@ -34,53 +31,45 @@ def requests_json_response(method, url, data="{}", ignore_errors=False, auth=Non
         elif method == "DELETE":
             r = requests.delete(url, auth=auth, verify=verify)
         else:
-            raise Exception(
-                "requests_json_response doesn't support request-method: {0}".format(method))
+            raise Exception("requests_json_response doesn't support request-method: {0}".format(method))
         r.raise_for_status()
         return r.json()
     except Exception as e:
-        message = "Failed to '{0}' to {1}. Exception: {2}:{3}.\nData: {4}".format(
-            method, url, type(e), str(e), data)
-        # If the response is resolvable as JSON, return it in the message
-        try:
-            message = message + \
-                "\nResponse: {5}".format(json.dumps(r.json(), indent=2))
-        except:
-            pass
+        message = "Failed to '{0}' to {1}. Exception: {2}:{3}.\nData: {4}".format(method, url, type(e), str(e), data)
         # Log if the logger was passed in
-        if not logger is None:
+        if logger is not None:
             logger.warning(message)
         if not ignore_errors:
-            raise(e)
+            raise Exception(e)
 
 
 def get_requests_json_response(url, **kwargs):
-    '''
+    """
     Calls requests_json_response with "GET" argument
     @param url - url param
     @param kwargs - passthrough kwargs
-    '''
+    """
     return requests_json_response("GET", url, **kwargs)
 
 
 def post_requests_json_response(url, **kwargs):
-    '''
+    """
     Calls requests_json_response with "POST" argument
     @param url - url param
     @param kwargs - passthrough kwargs
-    '''
+    """
     return requests_json_response("POST", url, **kwargs)
 
 
 def post_scrolled_json_responses(url, es_url, generator=False, **kwargs):
-    '''
+    """
     Calls get_json_rsponse in a scrolling manner (ES compatible)
     @param url - url to setup scan
     @param es_url - es url to scan through
     @param kwargs - pass through kwargs
     @param generator - True if we should return a generator and not a list
     @return: list of results from scrolled ES results
-    '''
+    """
 
     def getResultsGenerator():
         if not url.rstrip("/").endswith("_search"):
