@@ -30,9 +30,9 @@ class ElasticsearchUtility:
             return result
         except RequestError as e:
             if self.logger:
-                self.logger.exception(e)
+                self.logger.exception(e.info)
             else:
-                print(e)
+                print(e.info)
             raise e
         except (ElasticsearchException, Exception) as e:
             if self.logger:
