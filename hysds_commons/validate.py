@@ -12,19 +12,18 @@ import types
 # A global fail flag, used to fail the program on leathal errors
 fail = False
 
-SCHEMAS_DIR_PATH = os.path.join(os.path.dirname(os.path.realpath(__file__)),
-                                "../schemas")
+SCHEMAS_DIR_PATH = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../schemas")
 HYSDS_IO_SCHEMA_FILE = os.path.join(SCHEMAS_DIR_PATH, 'hysds-io-schema.json')
 JOB_SPEC_SCHEMA_FILE = os.path.join(SCHEMAS_DIR_PATH, 'job-spec-schema.json')
 
 
 def check_true(boolean, lethal, message):
-    '''
+    """
     Check if boolean is true, and print message if not true
     @param boolean: result of condition
     @param lethal: should this cause an error and fail the program
     @message: message to print
-    '''
+    """
     # Note: using global to fail program
     global fail
     if boolean:
@@ -37,12 +36,12 @@ def check_true(boolean, lethal, message):
 
 
 def check_paired_args(prefix, spec, io):
-    '''
+    """
     Check that the job-spec and hysds-io define the same parameters
     @param prefix - prefix
     @param spec - job-spec
     @param io - hysds-io
-    '''
+    """
     spec_names = [param.get("name", None) for param in spec.get("params", [])]
     io_names = [param.get("name", None) for param in io.get("params", [])]
 
@@ -59,11 +58,11 @@ def check_paired_args(prefix, spec, io):
 
 
 def check_lambdas(prefix, io):
-    '''
+    """
     Check that the lambdas are well formed in the hysds-io file
     @param prefix - prefix
     @param io - io object
-    '''
+    """
     params = io.get("params", [])
     for param in params:
         name = param.get("name", "no-name")
@@ -116,11 +115,11 @@ def validate(name, instance, schema):
 
 
 def pair(jsons):
-    '''
+    """
     Pair the JSONS to the base name
     @param jsons - jsons dictionary
     @return: list of dictioaries
-    '''
+    """
     objects = {}
     reg = re.compile("^.*/(.*)\\.json\\.?(.*)$")
     for k, v in list(jsons.items()):
@@ -138,11 +137,11 @@ def pair(jsons):
 
 
 def json_formatted(files):
-    '''
+    """
     Check JSON formatting
     @param files - files to loop through
     @return: name to JSON dict
-    '''
+    """
     jsons = {}
     for fle in files:
         try:
@@ -159,9 +158,7 @@ def json_formatted(files):
 
 
 if __name__ == "__main__":
-    '''
-    Main functions
-    '''
+    """Main functions"""
     if len(sys.argv) != 2:
         print("Usage:\n\t{} <directory>".format(sys.argv[0]), file=sys.stderr)
         sys.exit(-1)
