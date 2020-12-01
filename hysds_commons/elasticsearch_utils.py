@@ -5,13 +5,13 @@ from __future__ import absolute_import
 from future import standard_library
 standard_library.install_aliases()
 
-from elasticsearch import Elasticsearch
+import elasticsearch
 from elasticsearch.exceptions import NotFoundError, RequestError, ElasticsearchException
 
 
 class ElasticsearchUtility:
     def __init__(self, es_url, logger=None, **kwargs):
-        self.es = Elasticsearch(hosts=[es_url], **kwargs)
+        self.es = elasticsearch.Elasticsearch(hosts=[es_url], **kwargs)
         self.es_url = es_url
         self.logger = logger
 
@@ -249,7 +249,7 @@ class ElasticsearchUtility:
 
 # TODO: remove all code that uses this function
 def get_es_scrolled_data(es_url, index, query):
-    es = Elasticsearch([es_url])
+    es = elasticsearch.Elasticsearch([es_url])
 
     documents = []
     page = es.search(index=index, scroll='2m', size=100, body=query)
