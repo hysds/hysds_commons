@@ -65,11 +65,12 @@ def post_requests_json_response(url, **kwargs):
     return requests_json_response("POST", url, **kwargs)
 
 
-def post_scrolled_json_responses(url, es_url, generator=False, **kwargs):
+def post_scrolled_json_responses(url, es_url, paginate=False, generator=False, **kwargs):
     '''
     Calls get_json_rsponse in a scrolling manner (ES compatible)
     @param url - url to setup scan
     @param es_url - es url to scan through
+    @param paginate - True if result needs to be limited to size specified in query else scan
     @param kwargs - pass through kwargs
     @param generator - True if we should return a generator and not a list
     @return: list of results from scrolled ES results
@@ -77,23 +78,27 @@ def post_scrolled_json_responses(url, es_url, generator=False, **kwargs):
 
     def getResultsGenerator():
         if not url.rstrip("/").endswith("_search"):
-            raise Exception(
-                "Scrolling only works on search URLs. {0} incompatible.".format(url))
-        setup_url = url + "?search_type=scan&scroll=10m&size=100"
-        result = post_requests_json_response(setup_url, **kwargs)
-        # Harvest scan-setup
-        count = result['hits']['total']
-        scroll_id = result['_scroll_id']
-        scroll_url = es_url + "/scroll?scroll=10m"
-        while True:
-            # Data is no longer a query, and now a scroll_id
-            kwargs["data"] = scroll_id
-            result = post_requests_json_response(scroll_url, **kwargs)
-            scroll_id = result['_scroll_id']
-            if len(result['hits']['hits']) == 0:
-                break
+            raise Exception("Scrolling only works on search URLs. {0} incompatible.".format(url))
+        if paginate:
+            result = post_requests_json_response(url, **kwargs)
             for hit in result['hits']['hits']:
                 yield hit
+        else:
+            setup_url = url + "?search_type=scan&scroll=10m&size=100"
+            result = post_requests_json_response(setup_url, **kwargs)
+            # Harvest scan-setup
+            count = result['hits']['total']
+            scroll_id = result['_scroll_id']
+            scroll_url = es_url + "/scroll?scroll=10m"
+            while True:
+                # Data is no longer a query, and now a scroll_id
+                kwargs["data"] = scroll_id
+                result = post_requests_json_response(scroll_url, **kwargs)
+                scroll_id = result['_scroll_id']
+                if len(result['hits']['hits']) == 0:
+                    break
+                for hit in result['hits']['hits']:
+                    yield hit
 
     gen = getResultsGenerator()
     if generator:
