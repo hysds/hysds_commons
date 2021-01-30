@@ -61,8 +61,3 @@ def test_gpus_dependency_image():
     errors = __validate(test_file)
     logging.info(errors)
     assert len(errors) == 0
-
-
-test_valid()
-test_value()
-test_missing()
