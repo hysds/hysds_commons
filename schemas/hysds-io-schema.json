@@ -110,36 +110,28 @@
               "version_regex"
             ]
           }
-        }
-      ],
-      "oneOf": [
-        {
-          "properties": {
-            "type": {
-              "const": "object"
-            },
-            "default": {
-              "type": ["array", "object"]
-            }
-          },
-          "required": ["default"]
         },
         {
-          "properties": {
-            "type": {
-              "not": {
+          "if": {
+            "properties": {
+              "type": {
                 "const": "object"
               }
-            },
-            "default": {
-              "type": "string"
             }
           },
-          "required": ["default"]
-        },
-        {
-          "not": {
-            "required": ["default"]
+          "then": {
+            "properties": {
+              "default": {
+                "type": ["array", "object"]
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "default": {
+                "type": "string"
+              }
+            }
           }
         }
       ]
