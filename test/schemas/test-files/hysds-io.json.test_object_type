@@ -1,0 +1,58 @@
+{
+  "label": "Hello World",
+  "allowed_accounts": [ "ops" ],
+  "enable_dedup": true,
+  "disable_post_builtins": true,
+  "params": [
+    { "name": "product_paths",
+      "from": "dataset_jpath:_source",
+      "lambda": "lambda ds: list(filter(lambda x: x.startswith('s3://'), ds['urls']))[0]"
+    },
+    {
+     "name": "product_metadata",
+     "from": "dataset_jpath:_source",
+     "lambda" : "lambda ds: { 'metadata': ds['metadata'] }"
+    },
+    {
+      "name":"input_dataset_id",
+      "type":"text",
+      "from":"dataset_jpath:_id"
+    },
+    {
+      "name":"dataset_type",
+      "type":"text",
+      "from":"dataset_jpath:_source.dataset"
+    },
+    {
+      "name": "processing_type",
+      "from": "submitter",
+      "type": "enum",
+      "enumerables": ["forward", "reprocessing", "urgent"],
+      "default": "forward"
+    },
+    {
+      "name": "test_object",
+      "from": "submitter",
+      "type": "object",
+      "default": {"a": "x"}
+    },
+    {
+      "name": "test_object_invalid",
+      "from": "submitter",
+      "type": "object",
+      "default": "invalid_value"
+    },
+    {
+      "name": "test_array",
+      "from": "submitter",
+      "type": "object",
+      "default": ["a", "b"]
+    },
+    {
+      "name": "test_array_int",
+      "from": "submitter",
+      "type": "object",
+      "default": [1,2,3,4]
+    }
+  ]
+}

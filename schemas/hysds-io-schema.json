@@ -22,11 +22,10 @@
         },
         "type": {
           "type": "string",
-          "enum": ["text", "number", "datetime", "date", "boolean", "enum", "email", "textarea", "region", "container_version", "jobspec_version", "hysdsio_version"]
+          "enum": ["text", "number", "datetime", "date", "boolean", "enum", "email", "textarea", "region", "container_version", "jobspec_version", "hysdsio_version", "object"]
         },
         "default": {
-          "description": "default value to use (must be string even if it's a number)",
-          "type": "string"
+          "description": "default value to use, if type is object then [object|array] else must be string even if it's a number)"
         },
         "optional": {
           "description": "parameter is optional and can be left blank",
@@ -39,6 +38,7 @@
         "enumerables": {
           "description": "list of string values to enumerate via a dropdown list in the form input",
           "type": "array",
+          "uniqueItems": true,
           "items": {
             "type": "string"
           }
@@ -109,6 +109,29 @@
             "required": [
               "version_regex"
             ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "object"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "default": {
+                "type": ["array", "object"]
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "default": {
+                "type": "string"
+              }
+            }
           }
         }
       ]
