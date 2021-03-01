@@ -337,8 +337,7 @@ def resolve_mozart_job(product, rule, hysdsio=None, queue=None, component=None):
     job["params"] = json.dumps(params)  # set params
 
     # set enable_dedup setting from hysdsio
-    if 'enable_dedup' in hysdsio:
-        job['enable_dedup'] = hysdsio['enable_dedup']
+    job['enable_dedup'] = rule.get('enable_dedup', hysdsio.get('enable_dedup', True))
     return job
 
 
