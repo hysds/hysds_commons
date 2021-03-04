@@ -108,7 +108,6 @@ def iterate(component, rule):
 
             # disable dedup for passthru single submissions
             enable_dedup = False if not run_query and single else True
-            logger.info("enable_dedup: %s" % enable_dedup)
 
             # override enable_dedup setting from hysdsio
             if 'enable_dedup' in hysdsio:
