@@ -504,6 +504,9 @@ def submit_mozart_job(product, rule, hysdsio=None, queue=None, job_name=None, pa
     moz_job = resolve_mozart_job(product, rule, hysdsio, queue, component=component)
     logger.info("resolved mozart job: {}".format(json.dumps(moz_job)))
 
+    # enable dedup; param overrides hysdsio
+    dedup = moz_job.get('enable_dedup', True) if enable_dedup is None else enable_dedup
+
     # resolve hysds job
     job = resolve_hysds_job(job_type=moz_job['type'],
                             queue=moz_job['queue'],
@@ -512,7 +515,7 @@ def submit_mozart_job(product, rule, hysdsio=None, queue=None, job_name=None, pa
                             params=moz_job['params'],
                             job_name=job_name,
                             payload_hash=payload_hash,
-                            enable_dedup=moz_job['enable_dedup'],
+                            enable_dedup=dedup,
                             username=moz_job['username'],
                             soft_time_limit=moz_job['soft_time_limit'], time_limit=moz_job['time_limit'],
                             disk_usage=moz_job['disk_usage'])
