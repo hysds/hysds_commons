@@ -321,6 +321,7 @@ def resolve_mozart_job(product, rule, hysdsio=None, queue=None, component=None):
         "type": hysdsio["job-specification"],
         "tags": json.dumps([rule["rule_name"], hysdsio["id"]]),
         "username": rule.get("username", get_username()),
+        "enable_dedup": rule.get('enable_dedup', True)
     }
     rule["name"] = rule["rule_name"]
 
@@ -335,10 +336,6 @@ def resolve_mozart_job(product, rule, hysdsio=None, queue=None, component=None):
     logger.info("params: %s" % json.dumps(params, indent=2))
 
     job["params"] = json.dumps(params)  # set params
-
-    # set enable_dedup setting from hysdsio
-    if 'enable_dedup' in hysdsio:
-        job['enable_dedup'] = hysdsio['enable_dedup']
     return job
 
 
@@ -497,21 +494,28 @@ def submit_mozart_job(product, rule, hysdsio=None, queue=None, job_name=None, pa
 
     # raise if using deprecated keywords; TODO: remove in future release
     if soft_time_limit is not None or time_limit is not None:
-        raise RuntimeError("This parameter is no longer supported. Override these values by passing them in the `rule` "
-                           "param.")
+        raise RuntimeError("(soft_)time_limit is no longer supported. Override these values by passing them in the"
+                           "`rule` param")
+    if enable_dedup is not None:
+        raise RuntimeError("enable_dedup is no longer supported. Override these values by passing them in the `rule`"
+                           "param")
 
     # resolve mozart job
     moz_job = resolve_mozart_job(product, rule, hysdsio, queue, component=component)
-    logger.info("resolved mozart job: {}".format(json.dumps(moz_job, indent=2)))
-
-    # enable dedup; param overrides hysdsio
-    dedup = moz_job.get('enable_dedup', True) if enable_dedup is None else enable_dedup
+    logger.info("resolved mozart job: {}".format(json.dumps(moz_job)))
 
     # resolve hysds job
-    job = resolve_hysds_job(moz_job['type'], moz_job['queue'], moz_job['priority'],
-                            moz_job['tags'], moz_job['params'], job_name, payload_hash,
-                            dedup, moz_job['username'], moz_job['soft_time_limit'], moz_job['time_limit'],
-                            moz_job['disk_usage'])
+    job = resolve_hysds_job(job_type=moz_job['type'],
+                            queue=moz_job['queue'],
+                            priority=moz_job['priority'],
+                            tags=moz_job['tags'],
+                            params=moz_job['params'],
+                            job_name=job_name,
+                            payload_hash=payload_hash,
+                            enable_dedup=moz_job['enable_dedup'],
+                            username=moz_job['username'],
+                            soft_time_limit=moz_job['soft_time_limit'], time_limit=moz_job['time_limit'],
+                            disk_usage=moz_job['disk_usage'])
     logger.info("resolved HySDS job: {}".format(json.dumps(job, indent=2)))
 
     # submit hysds job
