@@ -79,61 +79,37 @@ class ElasticsearchUtility:
             _source_includes – A list of fields to extract and return from the _source field
             q – Query in the Lucene query string syntax
             scroll – Specify how long a consistent view of the index should be maintained for scrolled search
+            from_ – Starting offset (default: 0)
             size – Number of hits to return (default: 10)
             sort – A comma-separated list of <field>:<direction> pairs
-
-        https://elasticsearch-py.readthedocs.io/en/master/api.html#elasticsearch.Elasticsearch.clear_scroll
-            body – A comma-separated list of scroll IDs to clear if none was specified via the scroll_id parameter
-            scroll_id – A comma-separated list of scroll IDs to clear
         """
-        if 'scroll' not in kwargs:
-            kwargs['scroll'] = '2m'
-        scroll = kwargs['scroll']  # re-use in each subsequent scroll
+
+        if 'from_' not in kwargs:
+            kwargs['from_'] = 0
 
         if 'size' not in kwargs:
             kwargs['size'] = 100
 
+        page_size = kwargs['size']
         documents = []
-        scroll_ids = set()  # unique set of scroll_ids to clear
 
-        try:
-            if self.logger:
-                self.logger.info('query **kwargs: {}'.format(dict(**kwargs)))
-            page = self.es.search(**kwargs)
-            sid = page['_scroll_id']
-            scroll_ids.add(sid)
-            documents.extend(page['hits']['hits'])
-            page_size = page['hits']['total']['value']
-        except RequestError as e:
-            if self.logger:
-                self.logger.exception(e)
-            else:
-                print(e)
-            raise e
-        except (ElasticsearchException, Exception) as e:
-            if self.logger:
-                self.logger.exception(e)
-            else:
-                print(e)
-            raise e
+        while True:
+            try:
+                batch = self.es.search(**kwargs)
+                batch = batch['hits']['hits']
+            except RequestError as e:
+                if self.logger:
+                    self.logger.exception(e)
+                raise e
+            except (ElasticsearchException, Exception) as e:
+                if self.logger:
+                    self.logger.exception(e)
+                raise e
 
-        if page_size <= len(documents):  # avoid scrolling if we get all data in initial query
-            for scroll_id in scroll_ids:
-                self.es.clear_scroll(scroll_id=scroll_id)
-            return documents
-
-        while page_size > 0:
-            page = self.es.scroll(scroll_id=sid, scroll=scroll)
-            scroll_document = page['hits']['hits']
-            sid = page['_scroll_id']
-            scroll_ids.add(sid)
-
-            page_size = len(scroll_document)  # Get the number of results that we returned in the last scroll
-            documents.extend(scroll_document)
-
-        # clearing the _scroll_id, Elasticsearch can only keep a finite number of concurrent scroll's (default 500)
-        for scroll_id in scroll_ids:
-            self.es.clear_scroll(scroll_id=scroll_id)
+            kwargs['from_'] += page_size
+            if len(batch) < 1:
+                break
+            documents.extend(batch)
 
         return documents
 
