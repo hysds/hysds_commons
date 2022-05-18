@@ -29,16 +29,10 @@ class ElasticsearchUtility:
             result = self.es.index(**kwargs)
             return result
         except RequestError as e:
-            if self.logger:
-                self.logger.exception(e.info)
-            else:
-                print(e.info)
+            self.logger.exception(e.info) if self.logger else print(e.info)
             raise e
         except (ElasticsearchException, Exception) as e:
-            if self.logger:
-                self.logger.exception(e)
-            else:
-                print(e)
+            self.logger.exception(e) if self.logger else print(e)
             raise e
 
     def get_by_id(self, **kwargs):
@@ -55,17 +49,42 @@ class ElasticsearchUtility:
             data = self.es.get(**kwargs)
             return data
         except NotFoundError as e:
-            if self.logger:
-                self.logger.error(e)
-            else:
-                print(e)
+            self.logger.error(e) if self.logger else print(e)
             raise e
         except (ElasticsearchException, Exception) as e:
-            if self.logger:
-                self.logger.exception(e)
-            else:
-                print(e)
+            self.logger.exception(e) if self.logger else print(e)
             raise e
+
+    def _scroll(self, **kwargs):
+        if "size" not in kwargs:
+            kwargs["size"] = 100
+        if "scroll" not in kwargs:
+            kwargs["scroll"] = "2m"
+        scroll = kwargs["scroll"]  # re-use in each subsequent scroll
+
+        page = self.es.search(**kwargs)
+        sid = page["_scroll_id"]
+        scroll_id = sid
+        documents = page["hits"]["hits"]
+
+        page_size = page["hits"]["total"]["value"]
+        if page_size <= len(documents):  # avoid scrolling if we get all data in initial query
+            self.es.clear_scroll(scroll_id=scroll_id, ignore=[404])
+            return documents
+
+        while page_size > 0:
+            page = self.es.scroll(scroll_id=sid, scroll=scroll)
+            scroll_documents = page["hits"]["hits"]
+            sid = page["_scroll_id"]
+            if sid != scroll_id:
+                self.es.clear_scroll(scroll_id=scroll_id, ignore=[404])
+                scroll_id = sid
+
+            page_size = len(scroll_documents)
+            documents.extend(scroll_documents)
+
+        self.es.clear_scroll(scroll_id=scroll_id, ignore=[404])  # clear the last scroll id (if possible)
+        return documents
 
     def query(self, **kwargs):
         """
@@ -86,56 +105,32 @@ class ElasticsearchUtility:
             body – A comma-separated list of scroll IDs to clear if none was specified via the scroll_id parameter
             scroll_id – A comma-separated list of scroll IDs to clear
         """
-        if 'scroll' not in kwargs:
-            kwargs['scroll'] = '2m'
-        scroll = kwargs['scroll']  # re-use in each subsequent scroll
+        page_limit = 10000
+        if "size" not in kwargs:
+            kwargs["size"] = 100
+        elif kwargs["size"] >= page_limit:
+            kwargs["size"] = 250
+        scroll = kwargs.pop("scroll", "2m")
+        data = self.es.search(**kwargs)
+        total = data["hits"]["total"]["value"]
 
-        if 'size' not in kwargs:
-            kwargs['size'] = 100
+        if total >= page_limit:
+            kwargs["scroll"] = scroll
+            return self._scroll(**kwargs)
+        else:
+            page_size = kwargs["size"]
+            documents = data["hits"]["hits"]
+            kwargs["from_"] = 0
+            while page_size > 0:
+                kwargs["from_"] += page_size  # shift offset afterwards
+                if kwargs["from_"] + kwargs["size"] >= page_limit:
+                    kwargs["size"] = page_limit - kwargs["from_"]
 
-        documents = []
-        scroll_ids = set()  # unique set of scroll_ids to clear
-
-        try:
-            if self.logger:
-                self.logger.info('query **kwargs: {}'.format(dict(**kwargs)))
-            page = self.es.search(**kwargs)
-            sid = page['_scroll_id']
-            scroll_ids.add(sid)
-            documents.extend(page['hits']['hits'])
-            page_size = page['hits']['total']['value']
-        except RequestError as e:
-            if self.logger:
-                self.logger.exception(e)
-            else:
-                print(e)
-            raise e
-        except (ElasticsearchException, Exception) as e:
-            if self.logger:
-                self.logger.exception(e)
-            else:
-                print(e)
-            raise e
-
-        if page_size <= len(documents):  # avoid scrolling if we get all data in initial query
-            for scroll_id in scroll_ids:
-                self.es.clear_scroll(scroll_id=scroll_id)
+                data = self.es.search(**kwargs)
+                rows = data["hits"]["hits"]
+                page_size = len(rows)
+                documents.extend(rows)
             return documents
-
-        while page_size > 0:
-            page = self.es.scroll(scroll_id=sid, scroll=scroll)
-            scroll_document = page['hits']['hits']
-            sid = page['_scroll_id']
-            scroll_ids.add(sid)
-
-            page_size = len(scroll_document)  # Get the number of results that we returned in the last scroll
-            documents.extend(scroll_document)
-
-        # clearing the _scroll_id, Elasticsearch can only keep a finite number of concurrent scroll's (default 500)
-        for scroll_id in scroll_ids:
-            self.es.clear_scroll(scroll_id=scroll_id)
-
-        return documents
 
     def search(self, **kwargs):
         """
@@ -151,26 +146,20 @@ class ElasticsearchUtility:
         """
         try:
             if self.logger:
-                self.logger.info('search **kwargs: {}'.format(dict(**kwargs)))
+                self.logger.info("search **kwargs: {}".format(dict(**kwargs)))
             result = self.es.search(**kwargs)
             return result
         except RequestError as e:
-            if self.logger:
-                self.logger.exception(e)
-            else:
-                print(e)
+            self.logger.exception(e) if self.logger else print(e)
             raise e
         except (ElasticsearchException, Exception) as e:
-            if self.logger:
-                self.logger.exception(e)
-            else:
-                print(e)
+            self.logger.exception(e) if self.logger else print(e)
             raise e
 
     def get_count(self, **kwargs):
         """
         returning the count for a given query (warning: ES7 returns max of 10000)
-        # https://elasticsearch-py.readthedocs.io/en/master/api.html#elasticsearch.Elasticsearch.count
+        https://elasticsearch-py.readthedocs.io/en/master/api.html#elasticsearch.Elasticsearch.count
             body – A query to restrict the results specified with the Query DSL (optional)
             index – (required) A comma-separated list of indices to restrict the results
             q – Query in the Lucene query string syntax
@@ -178,12 +167,9 @@ class ElasticsearchUtility:
         """
         try:
             result = self.es.count(**kwargs)
-            return result['count']
+            return result["count"]
         except (ElasticsearchException, Exception) as e:
-            if self.logger:
-                self.logger.exception(e)
-            else:
-                print(e)
+            self.logger.exception(e) if self.logger else print(e)
             raise e
 
     def delete_by_id(self, **kwargs):
@@ -197,20 +183,14 @@ class ElasticsearchUtility:
         """
         try:
             if self.logger:
-                self.logger.info('query **kwargs: {}'.format(dict(**kwargs)))
+                self.logger.info("query **kwargs: {}".format(dict(**kwargs)))
             result = self.es.delete(**kwargs)
             return result
         except NotFoundError as e:
-            if self.logger:
-                self.logger.exception(e)
-            else:
-                print(e)
+            self.logger.exception(e) if self.logger else print(e)
             raise e
         except (ElasticsearchException, Exception) as e:
-            if self.logger:
-                self.logger.exception(e)
-            else:
-                print(e)
+            self.logger.exception(e) if self.logger else print(e)
             raise e
 
     def update_document(self, **kwargs):
@@ -230,20 +210,14 @@ class ElasticsearchUtility:
         """
         try:
             if self.logger:
-                self.logger.info('update_document **kwargs'.format(dict(**kwargs)))
+                self.logger.info("update_document **kwargs".format(dict(**kwargs)))
             result = self.es.update(**kwargs)
             return result
         except RequestError as e:
-            if self.logger:
-                self.logger.exception(e)
-            else:
-                print(e)
+            self.logger.exception(e) if self.logger else print(e)
             raise e
         except (ElasticsearchException, Exception) as e:
-            if self.logger:
-                self.logger.exception(e)
-            else:
-                print(e)
+            self.logger.exception(e) if self.logger else print(e)
             raise e
 
 
@@ -252,19 +226,19 @@ def get_es_scrolled_data(es_url, index, query):
     es = elasticsearch.Elasticsearch([es_url])
 
     documents = []
-    page = es.search(index=index, scroll='2m', size=100, body=query)
+    page = es.search(index=index, scroll="2m", size=100, body=query)
 
-    sid = page['_scroll_id']
-    documents.extend(page['hits']['hits'])
-    page_size = page['hits']['total']['value']
+    sid = page["_scroll_id"]
+    documents.extend(page["hits"]["hits"])
+    page_size = page["hits"]["total"]["value"]
 
     # Start scrolling
     while page_size > 0:
-        page = es.scroll(scroll_id=sid, scroll='2m')
+        page = es.scroll(scroll_id=sid, scroll="2m")
 
         # Update the scroll ID
-        sid = page['_scroll_id']
-        scroll_document = page['hits']['hits']
+        sid = page["_scroll_id"]
+        scroll_document = page["hits"]["hits"]
 
         # Get the number of results that we returned in the last scroll
         page_size = len(scroll_document)
