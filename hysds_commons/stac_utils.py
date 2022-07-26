@@ -11,7 +11,7 @@ def bbox(coord_list):
     ret = f"({box[0][0]}, {box[1][0]}, {box[0][1]}, {box[1][1]})"
     return ret
 
-def create_stac_doc(product_directory, metadata, mapping, assets_desc, product_type, context):
+def create_stac_doc(product_directory, metadata, mapping, assets_desc, product_type, product_path):
     stac_doc = dict()
 
     # Creating stac doc based on mapping configuration of project
@@ -59,8 +59,6 @@ def create_stac_doc(product_directory, metadata, mapping, assets_desc, product_t
 
     # Start generating assets.
     assets = dict()
-
-    product_path = context.get("localize_urls")[0]
 
     # get assets description based on product type
     prod_desc = assets_desc.get(product_type)
