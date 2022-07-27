@@ -11,7 +11,7 @@ def bbox(coord_list):
     ret = f"({box[0][0]}, {box[1][0]}, {box[0][1]}, {box[1][1]})"
     return ret
 
-def create_stac_doc(product_directory, metadata, mapping, assets_desc, product_type, product_path):
+def create_stac_doc(product_directory, metadata, mapping, assets_desc, product_type, product_path, lineage):
     stac_doc = dict()
 
     # Creating stac doc based on mapping configuration of project
