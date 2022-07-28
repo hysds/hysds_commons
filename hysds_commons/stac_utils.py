@@ -3,11 +3,6 @@ import os
 import json
 from hysds_commons.log_utils import logger
 
-# load project configuration files
-# load product metadata file
-# read in product_path from _context.json
-# create list for product lineage
-
 def generate_bbox(coord_list):
     """This function creates a bounding box for an input list of coordinates describing a polygon.  The function is called within the create_stac_doc function.
 
