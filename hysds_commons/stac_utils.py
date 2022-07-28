@@ -8,10 +8,19 @@ from hysds_commons.log_utils import logger
 # read in product_path from _context.json
 # create list for product lineage
 
+def generate_bbox(coord_list):
+    """This function creates a bbox for an input list of coordinates describing a polygon.  The function is called within the create_stac_doc function.
 
-# This function creates a bbox for an input list of coordinates describing a polygon. 
-# The function is called within the create_stac_doc function.
-def bbox(coord_list):
+    Parameters
+    ----------
+    coord_list (list) - a list of coordinates where each coordinate is expressed as x, y
+
+    Returns
+    -------
+    ret
+        the bounding box created for the input polygon
+    """
+
     box = []
     for i in (0, 1):
         res = sorted(coord_list, key=lambda x: x[i])
@@ -19,10 +28,27 @@ def bbox(coord_list):
     ret = f"({box[0][0]}, {box[1][0]}, {box[0][1]}, {box[1][1]})"
     return ret
 
-# This function generate takes in the product metadata and 
-# project configuration files to return a STAC document.
+
 def create_stac_doc(product_directory, metadata, mapping, assets_desc, product_type, product_path, lineage):
     stac_doc = dict()
+    """This function generate takes in the product metadata and project configuration files to return a STAC document.
+    
+    Parameters
+    ----------
+
+    product_directory (str) - Name of product downloaded into work directory
+    metadata (dict) - .met.json file content of the product
+    mapping (dict) - file content of stac_mappings.json
+    assets_desc (dict) - file content of assets_description.json
+    product_type (str) - product / dataset type
+    product_path (str) - S3 location or URL of product
+    lineage (list) - list of URLs pointing to location of every file used as input to generate the product
+
+    Returns
+    -------
+    ret
+        it is the STAC JSON for the input product, compliant with STAC requirements for an item
+    """
 
     # Creating stac doc based on mapping configuration of project
     # 'field_mappings' Defines a 1:1 mapping between the expected field name in STAC to the 
@@ -97,16 +123,4 @@ def create_stac_doc(product_directory, metadata, mapping, assets_desc, product_t
 
     logger.info("created stac document: %s" % json.dumps(stac_doc, indent=4))
 
-    # return stac_doc, it is a dictionary, it is the STAC JSON for the 
-    # input product, compliant with STAC requirements for an item
     return stac_doc
-
-
-# Parameter description from create_stac_doc:
-# product_directory (str) - Name of product downloaded into work directory
-# metadata (dict) - .met.json file content of the product
-# mapping (dict) - file content of stac_mappings.json
-# assets_desc (dict) - file content of assets_description.json
-# product_type (str) - product / dataset type
-# product_path (str) - S3 location or URL of product
-# lineage (list) - list of URLs pointing to location of every file used as input to generate the product
