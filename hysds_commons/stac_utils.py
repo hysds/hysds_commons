@@ -46,7 +46,7 @@ def create_stac_doc(product_directory, metadata, mapping, assets_desc, product_t
 
     Returns
     -------
-    ret
+    stac_doc
         it is the STAC JSON for the input product, compliant with STAC requirements for an item
     """
 
