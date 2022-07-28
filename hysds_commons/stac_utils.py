@@ -9,7 +9,7 @@ from hysds_commons.log_utils import logger
 # create list for product lineage
 
 def generate_bbox(coord_list):
-    """This function creates a bounding box box for an input list of coordinates describing a polygon.  The function is called within the create_stac_doc function.
+    """This function creates a bounding box for an input list of coordinates describing a polygon.  The function is called within the create_stac_doc function.
 
     Parameters
     ----------
