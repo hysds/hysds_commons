@@ -4,18 +4,11 @@ import json
 from hysds_commons.log_utils import logger
 
 def generate_bbox(coord_list):
-    """This function creates a bounding box for an input list of coordinates describing a polygon.  The function is called within the create_stac_doc function.
-
-    Parameters
-    ----------
-    coord_list (list) - a list of coordinates where each coordinate is expressed as x, y
-
-    Returns
-    -------
-    ret
-        the bbox created for the input polygon
-    """
-
+# This function creates a bounding box for an input list of coordinates describing a polygon.  The function is called within the create_stac_doc function.
+    '''
+    :param coord_list (dict): a list of coordinates where each coordinate is expressed as x, y
+    :return ret (list): the bbox created for the input polygon
+    '''
     box = []
     for i in (0, 1):
         res = sorted(coord_list, key=lambda x: x[i])
@@ -26,24 +19,16 @@ def generate_bbox(coord_list):
 
 def create_stac_doc(product_directory, metadata, mapping, assets_desc, product_type, product_path, lineage):
     stac_doc = dict()
-    """This function generate takes in the product metadata and project configuration files to return a STAC document.
-    
-    Parameters
-    ----------
-
-    product_directory (str) - Name of product downloaded into work directory
-    metadata (dict) - .met.json file content of the product
-    mapping (dict) - file content of stac_mappings.json
-    assets_desc (dict) - file content of assets_description.json
-    product_type (str) - product / dataset type
-    product_path (str) - S3 location or URL of product
-    lineage (list) - list of URLs pointing to location of every file used as input to generate the product
-
-    Returns
-    -------
-    stac_doc
-        it is the STAC JSON for the input product, compliant with STAC requirements for an item
-    """
+    '''
+    :param product_directroy (str): Name of product downloaded into work directory
+    :param metadata (dict): .met.json file content of the product
+    :param mapping (dict): file content of stac_mappings.json
+    :param assets_desc (dict): file content of assets_description.json
+    :param product_type (str): product / dataset type
+    :param product_path (str): S3 location or URL of product
+    :param lineage (list): list of URLs pointing to location of every file used as input to generate the product
+    :return stac_doc (dict): it is the STAC JSON for the input product, compliant with STAC requirements for an item
+    '''
 
     # Creating stac doc based on mapping configuration of project
     # 'field_mappings' Defines a 1:1 mapping between the expected field name in STAC to the 
@@ -90,8 +75,8 @@ def create_stac_doc(product_directory, metadata, mapping, assets_desc, product_t
             "coordinates": [[[-180, -90], [-180, 90], [180, 90], [180, -90], [-180, -90]]]
         }
 
-    # assign to stac to bbox
-    stac_doc["bbox"] = bbox(stac_doc.get("geometry").get("coordinates")[0])
+    # assign to stac to generate_bbox
+    stac_doc["bbox"] = generate_bbox(stac_doc.get("geometry").get("coordinates")[0])
 
     # Start generating assets
     assets = dict()
