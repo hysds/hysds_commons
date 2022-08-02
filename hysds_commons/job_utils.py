@@ -413,8 +413,11 @@ def resolve_hysds_job(job_type=None, queue=None, priority=None, tags=None, param
         # TODO: change to "check_inputs"
         # match_inputs(param,context)
         logger.info("param: {}".format(param))
-        if param["name"] not in params and param["name"] not in optional_params:
-            raise RuntimeError("'params' must specify '{0}' parameter".format(param["name"]))
+        if param["name"] not in params:
+            if param["name"] in optional_params:
+                logger.info("{0} is not given but optional, skipping...".format(param["name"]))
+            else:
+                raise RuntimeError("'params' must specify '{0}' parameter".format(param["name"]))
         param["value"] = params[param["name"]]
         route_outputs(param, context, positional, localize_urls)
 
