@@ -415,7 +415,8 @@ def resolve_hysds_job(job_type=None, queue=None, priority=None, tags=None, param
         logger.info("param: {}".format(param))
         if param["name"] not in params:
             if param["name"] in optional_params:
-                logger.info("{0} is not given but optional, skipping...".format(param["name"]))
+                logger.warning("{0} is not given but optional, skipping...".format(param["name"]))
+                continue
             else:
                 raise RuntimeError("'params' must specify '{0}' parameter".format(param["name"]))
         param["value"] = params[param["name"]]
