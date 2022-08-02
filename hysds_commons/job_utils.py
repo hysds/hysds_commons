@@ -49,7 +49,7 @@ def get_hysds_io_optional_params(job_spec):
     :param job_spec: str - name of job_spec
     :return: Set[Str]
     """
-    optional_params = set()
+    optional_params = dict()
     hysdsio_name = job_spec.replace("job", "hysds-io")
 
     hysds_io = mozart_es.get_by_id(index="hysds_ios-grq", id=hysdsio_name, ignore=[404])
@@ -59,8 +59,9 @@ def get_hysds_io_optional_params(job_spec):
             return set()
     params = hysds_io["_source"]["params"]
     for param in params:
+        param_name = param["name"]
         if param.get("optional", False) is True:
-            optional_params.add(param["name"])
+            optional_params[param_name] = param
     return optional_params
 
 
@@ -415,10 +416,15 @@ def resolve_hysds_job(job_type=None, queue=None, priority=None, tags=None, param
         logger.info("param: {}".format(param))
         if param["name"] not in params:
             if param["name"] in optional_params:
-                logger.warning("{0} is not given but optional, skipping...".format(param["name"]))
+                default = optional_params[param["name"]].get("default", None)
+                if default is not None:
+                    logger.warning("{0} (optional) not found, using default value {1}".format(param["name"], default))
+                    param["value"] = default
+                else:
+                    logger.warning("{0} is not given but optional, skipping...".format(param["name"]))
                 continue
             else:
-                raise RuntimeError("'params' must specify '{0}' parameter".format(param["name"]))
+                raise RuntimeError("params must specify '{0}' parameter".format(param["name"]))
         param["value"] = params[param["name"]]
         route_outputs(param, context, positional, localize_urls)
 
