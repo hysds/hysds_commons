@@ -43,13 +43,14 @@ def get_params_for_products_set(wiring, kwargs, passthrough=None, products=None)
     return params
 
 
-def get_hysds_io_optional_params(job_spec):
+def get_hysds_io_params(job_spec):
     """
     returns a set of optional parameters from the hysds-io given the job_spec
     :param job_spec: str - name of job_spec
-    :return: Set[Str]
+    :return: Dict[str, Dict], Set[Str]
     """
-    optional_params = dict()
+    hysdsio_params = dict()
+    optional_params = set()
     hysdsio_name = job_spec.replace("job", "hysds-io")
 
     hysds_io = mozart_es.get_by_id(index="hysds_ios-grq", id=hysdsio_name, ignore=[404])
@@ -60,9 +61,10 @@ def get_hysds_io_optional_params(job_spec):
     params = hysds_io["_source"]["params"]
     for param in params:
         param_name = param["name"]
+        hysdsio_params[param_name] = param
         if param.get("optional", False) is True:
-            optional_params[param_name] = param
-    return optional_params
+            optional_params.add(param_name)
+    return hysdsio_params, optional_params
 
 
 def get_params_for_submission(wiring, kwargs, passthrough=None, product=None, params=None, aggregate=False):
@@ -397,7 +399,7 @@ def resolve_hysds_job(job_type=None, queue=None, priority=None, tags=None, param
     specification = specification['_source']
 
     # optional parameters from hysds-io
-    optional_params = get_hysds_io_optional_params(job_type)
+    hysdsio_params, optional_params = get_hysds_io_params(job_type)
 
     container_id = specification.get("container", None)
     container_spec = mozart_es.get_by_id(index='containers', id=container_id)
@@ -415,17 +417,18 @@ def resolve_hysds_job(job_type=None, queue=None, priority=None, tags=None, param
         # match_inputs(param,context)
         logger.info("param: {}".format(param))
         if param["name"] not in params:
-            if param["name"] in optional_params:
-                default = optional_params[param["name"]].get("default", None)
-                if default is not None:
-                    logger.warning("{0} (optional) not found, using default value {1}".format(param["name"], default))
-                    param["value"] = default
-                else:
-                    logger.warning("{0} is not given but optional, skipping...".format(param["name"]))
-                continue
+            default_value = hysdsio_params.get(param["name"], {}).get("default", None)
+            if default_value is not None:
+                logger.warning("{0} not found, using default value {1}".format(param["name"], default_value))
+                param["value"] = default_value
             else:
-                raise RuntimeError("params must specify '{0}' parameter".format(param["name"]))
-        param["value"] = params[param["name"]]
+                if param["name"] in optional_params:
+                    logger.warning("{0} is not supplied but optional, skipping...".format(param["name"]))
+                    continue
+                else:
+                    raise RuntimeError("params must specify '{0}' parameter".format(param["name"]))
+        else:
+            param["value"] = params[param["name"]]
         route_outputs(param, context, positional, localize_urls)
 
     cmd = get_command_line(specification.get("command", None), positional)  # build command line
