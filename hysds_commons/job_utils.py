@@ -420,7 +420,7 @@ def resolve_hysds_job(job_type=None, queue=None, priority=None, tags=None, param
             default_value = hysdsio_params.get(param["name"], {}).get("default", None)
             if default_value is not None:
                 logger.warning("{0} not found, using default value {1}".format(param["name"], default_value))
-                param["value"] = default_value
+                param["value"] = run_type_conversion(hysdsio_params[param["name"]], default_value)
             else:
                 if param["name"] in optional_params:
                     logger.warning("{0} is not supplied but optional, skipping...".format(param["name"]))
