@@ -1,9 +1,12 @@
 import copy
-import os
 import json
+import os
+from shapely.geometry import shape
 from hysds_commons.log_utils import logger
 
 def generate_bbox(coord_list):
+
+# def generate_bbox(coord_list)
 # This function creates a bounding box for an input list of coordinates describing a polygon.  The function is called within the create_stac_doc function.
     '''
     :param coord_list (dict): a list of coordinates where each coordinate is expressed as x, y
@@ -11,8 +14,8 @@ def generate_bbox(coord_list):
     '''
     box = []
     for i in (0, 1):
-        res = sorted(coord_list, key=lambda x: x[i])
-        box.append((res[0][i], res[-1][i]))
+         res = sorted(coord_list, key=lambda x: x[i])
+         box.append((res[0][i], res[-1][i]))
     ret = f"({box[0][0]}, {box[1][0]}, {box[0][1]}, {box[1][1]})"
     return ret
 
@@ -76,7 +79,7 @@ def create_stac_doc(product_directory, metadata, mapping, assets_desc, product_t
         }
 
     # assign to stac to generate_bbox
-    stac_doc["bbox"] = generate_bbox(stac_doc.get("geometry").get("coordinates")[0])
+    stac_doc["bbox"] = list(shape(stac_doc.get("geometry")).bounds)
 
     # Start generating assets
     assets = dict()
