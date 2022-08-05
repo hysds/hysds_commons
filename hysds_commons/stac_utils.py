@@ -4,25 +4,11 @@ import os
 from shapely.geometry import shape
 from hysds_commons.log_utils import logger
 
-def generate_bbox(coord_list):
-
-# def generate_bbox(coord_list)
-# This function creates a bounding box for an input list of coordinates describing a polygon.  The function is called within the create_stac_doc function.
-    '''
-    :param coord_list (dict): a list of coordinates where each coordinate is expressed as x, y
-    :return ret (list): the bbox created for the input polygon
-    '''
-    box = []
-    for i in (0, 1):
-         res = sorted(coord_list, key=lambda x: x[i])
-         box.append((res[0][i], res[-1][i]))
-    ret = f"({box[0][0]}, {box[1][0]}, {box[0][1]}, {box[1][1]})"
-    return ret
-
 
 def create_stac_doc(product_directory, metadata, mapping, assets_desc, product_type, product_path, lineage):
-    stac_doc = dict()
+    
     '''
+    Creating stac doc based on mapping configuration of project
     :param product_directroy (str): Name of product downloaded into work directory
     :param metadata (dict): .met.json file content of the product
     :param mapping (dict): file content of stac_mappings.json
@@ -32,8 +18,8 @@ def create_stac_doc(product_directory, metadata, mapping, assets_desc, product_t
     :param lineage (list): list of URLs pointing to location of every file used as input to generate the product
     :return stac_doc (dict): it is the STAC JSON for the input product, compliant with STAC requirements for an item
     '''
+    stac_doc = dict()
 
-    # Creating stac doc based on mapping configuration of project
     # 'field_mappings' Defines a 1:1 mapping between the expected field name in STAC to the 
     # metadata key found in the product's met.json file.
     field_mapping = mapping.get("field_mappings")
@@ -78,7 +64,7 @@ def create_stac_doc(product_directory, metadata, mapping, assets_desc, product_t
             "coordinates": [[[-180, -90], [-180, 90], [180, 90], [180, -90], [-180, -90]]]
         }
 
-    # assign to stac to generate_bbox
+    # generate bbox with shapely library
     stac_doc["bbox"] = list(shape(stac_doc.get("geometry")).bounds)
 
     # Start generating assets
