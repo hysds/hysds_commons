@@ -17,6 +17,7 @@ setup(
         'elasticsearch>=7.0.0,<7.14.0',
         'requests>=2.7.0',
         'future>=0.17.1',
-        "jsonschema>=3.0.1"
+        "jsonschema>=3.0.1",
+        "shapely>=1.8.2"
     ]
 )
