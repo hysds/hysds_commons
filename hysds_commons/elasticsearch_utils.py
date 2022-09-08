@@ -5,6 +5,7 @@ from __future__ import absolute_import
 from future import standard_library
 standard_library.install_aliases()
 
+from packaging import version
 import elasticsearch
 from elasticsearch.exceptions import NotFoundError, RequestError, ElasticsearchException
 
@@ -14,6 +15,9 @@ class ElasticsearchUtility:
         self.es = elasticsearch.Elasticsearch(hosts=[es_url], **kwargs)
         self.es_url = es_url
         self.logger = logger
+
+        es_info = self.es.info()
+        self.version = version.parse(es_info["version"]["number"])
 
     def index_document(self, **kwargs):
         """
@@ -151,13 +155,18 @@ class ElasticsearchUtility:
         page_limit = 10000
         if "size" not in kwargs and "size" not in kwargs.get("body", {}):
             kwargs["size"] = 500
+        else:
+            kwargs["size"] = kwargs.get("size") or kwargs.get("body", {}).get("size", 1000)
         scroll = kwargs.pop("scroll", "2m")
         data = self.es.search(**kwargs)
         total = data["hits"]["total"]["value"]
 
         if total >= page_limit:
-            kwargs["scroll"] = scroll
-            return self._scroll(**kwargs)
+            if self.version >= version.parse("7.10"):
+                return self._pit(**kwargs)
+            else:
+                kwargs["scroll"] = scroll
+                return self._scroll(**kwargs)
         else:
             page_size = kwargs["size"]
             documents = data["hits"]["hits"]
