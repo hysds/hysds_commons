@@ -15,7 +15,12 @@ class ElasticsearchUtility:
         self.es = elasticsearch.Elasticsearch(hosts=[es_url], **kwargs)
         self.es_url = es_url
         self.logger = logger
+        self.version = None
 
+    def set_es_version(self):
+        """
+        Sets the version of elasticsearch; ex. 7.10.2
+        """
         es_info = self.es.info()
         self.version = version.parse(es_info["version"]["number"])
 
@@ -162,6 +167,8 @@ class ElasticsearchUtility:
         total = data["hits"]["total"]["value"]
 
         if total >= page_limit:
+            if self.version is None:
+                self.set_es_version()
             if self.version >= version.parse("7.10"):
                 return self._pit(**kwargs)
             else:
