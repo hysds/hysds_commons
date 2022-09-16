@@ -154,7 +154,7 @@ class ElasticsearchUtility:
         """
         page_limit = 10000
         if "size" not in kwargs and "size" not in kwargs.get("body", {}):
-            kwargs["size"] = 500
+            kwargs["size"] = 1000
         else:
             kwargs["size"] = kwargs.get("size") or kwargs.get("body", {}).get("size", 1000)
         scroll = kwargs.pop("scroll", "2m")
