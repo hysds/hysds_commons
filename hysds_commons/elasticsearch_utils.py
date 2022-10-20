@@ -5,6 +5,7 @@ from __future__ import absolute_import
 from future import standard_library
 standard_library.install_aliases()
 
+from packaging import version
 import elasticsearch
 from elasticsearch.exceptions import NotFoundError, RequestError, ElasticsearchException
 
@@ -14,6 +15,14 @@ class ElasticsearchUtility:
         self.es = elasticsearch.Elasticsearch(hosts=[es_url], **kwargs)
         self.es_url = es_url
         self.logger = logger
+        self.version = None
+
+    def set_es_version(self):
+        """
+        Sets the version of elasticsearch; ex. 7.10.2
+        """
+        es_info = self.es.info()
+        self.version = version.parse(es_info["version"]["number"])
 
     def index_document(self, **kwargs):
         """
@@ -55,9 +64,52 @@ class ElasticsearchUtility:
             self.logger.exception(e) if self.logger else print(e)
             raise e
 
+    def _pit(self, **kwargs):
+        """
+        using the PIT (point-in-time) + search_after API to do deep pagination
+        https://www.elastic.co/guide/en/elasticsearch/reference/7.10/point-in-time-api.html
+        https://www.elastic.co/guide/en/elasticsearch/reference/7.10/paginate-search-results.html#search-after
+        :param kwargs: please see the docstrings for the "search" method below
+            * index is required when using the search_after API
+        :return: List[any]
+        """
+        keep_alive = "2m"
+        body = kwargs.pop("body", {})
+        index = kwargs.pop("index", body.pop("index", None))
+        if index is None:
+            raise RuntimeError("ElasticsearchUtility._pit: the search_after API must specify a index/alias")
+
+        pit = self.es.open_point_in_time(index=index, keep_alive=keep_alive)
+
+        size = kwargs.get("size", body.get("size", 1000))
+        if not size:
+            kwargs["size"] = size
+
+        sort = kwargs.get("sort", body.get("sort", []))
+        if not sort:
+            body["sort"] = [{"@timestamp": "desc"}, {"id.keyword": "asc"}]
+
+        body = {
+            **body,
+            **{"pit": {**pit, **{"keep_alive": keep_alive}}},
+        }
+        res = self.es.search(body=body, **kwargs)
+
+        records = []
+        while True:
+            if len(res["hits"]["hits"]) == 0:
+                break
+            records.extend(res["hits"]["hits"])
+            last_record = res["hits"]["hits"][-1]
+            body["search_after"] = last_record["sort"]
+            res = self.es.search(body=body, **kwargs)
+
+        self.es.close_point_in_time(body=pit)
+        return records
+
     def _scroll(self, **kwargs):
         if "size" not in kwargs:
-            kwargs["size"] = 100
+            kwargs["size"] = 1000
         if "scroll" not in kwargs:
             kwargs["scroll"] = "2m"
         scroll = kwargs["scroll"]  # re-use in each subsequent scroll
@@ -106,17 +158,22 @@ class ElasticsearchUtility:
             scroll_id – A comma-separated list of scroll IDs to clear
         """
         page_limit = 10000
-        if "size" not in kwargs:
-            kwargs["size"] = 100
-        elif kwargs["size"] >= page_limit:
-            kwargs["size"] = 250
+        if "size" not in kwargs and "size" not in kwargs.get("body", {}):
+            kwargs["size"] = 1000
+        else:
+            kwargs["size"] = kwargs.get("size") or kwargs.get("body", {}).get("size", 1000)
         scroll = kwargs.pop("scroll", "2m")
         data = self.es.search(**kwargs)
         total = data["hits"]["total"]["value"]
 
         if total >= page_limit:
-            kwargs["scroll"] = scroll
-            return self._scroll(**kwargs)
+            if self.version is None:
+                self.set_es_version()
+            if self.version >= version.parse("7.10"):
+                return self._pit(**kwargs)
+            else:
+                kwargs["scroll"] = scroll
+                return self._scroll(**kwargs)
         else:
             page_size = kwargs["size"]
             documents = data["hits"]["hits"]
