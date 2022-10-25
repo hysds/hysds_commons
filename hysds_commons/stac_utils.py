@@ -20,12 +20,23 @@ def create_stac_doc(product_directory, metadata, mapping, assets_desc, product_t
     '''
     stac_doc = dict()
 
+    # set all static/ hardcoded values as defined in value_mappings
+    value_mapping =  mapping.get("value_mappings")
+    for k in value_mapping:
+        # assign value
+        stac_doc[k] = value_mapping.get(k)
+
     # 'field_mappings' Defines a 1:1 mapping between the expected field name in STAC to the 
     # metadata key found in the product's met.json file.
     field_mapping = mapping.get("field_mappings")
     for k in field_mapping:
-        stac_doc[k] = metadata.get(field_mapping.get(k))
-
+        # check if the value of k is a list
+        if isinstance(field_mapping.get(k), list) and not bool(field_mapping.get(k)):
+            for x in field_mapping.get(k):
+                if metadata.get(x) is not None:
+                    stac_doc[k] = metadata.get(x)
+        else:
+            stac_doc[k] = metadata.get(field_mapping.get(k))
 
     stac_links = []
     # 'code_mappings' derives values for certain STAC fields when they are not straight forward mappings. 
@@ -46,10 +57,6 @@ def create_stac_doc(product_directory, metadata, mapping, assets_desc, product_t
                 stac_links.append(link)
             stac_doc["links"] = stac_links
 
-    # Update
-    # Loop over everything in the field i just created from mappings
-    # Value in that list becomes variable, once you have this substitue hardcoded values
-
     # Creating properties. Copy over all the metadata EXCLUDING ID and Geometry
     # Function removes id and geometry from mappings file
     properties = copy.deepcopy(metadata)
@@ -61,21 +68,6 @@ def create_stac_doc(product_directory, metadata, mapping, assets_desc, product_t
             logger.info("Fields cannot be deleted")
     
     stac_doc["properties"] = properties
-
-    # # Creating properties. Copy over all the metadata EXCLUDING ID and Geometry
-    # properties = copy.deepcopy(metadata) # fine
-    # del properties[field_mapping.get("id")]
-    # # This try-except block is included because not every product will have bounding polygon
-    # # 
-    # try:
-    #     del properties[field_mapping.get("geometry")] # replace "" with variable
-    # # change logger to a more suitable statement if it cant be deleted
-    # except KeyError:
-    #     logger.info("Bounding Polygon not found in metadata. web")
-    # stac_doc["properties"] = properties
-
-
-
 
     # Set geometry, if doesn't exist in product then set to global coordinates
     if metadata.get(field_mapping.get("geometry")) is not None:
