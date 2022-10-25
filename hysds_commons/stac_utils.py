@@ -5,7 +5,7 @@ from shapely.geometry import shape
 from hysds_commons.log_utils import logger
 
 
-def create_stac_doc(product_directory, metadata, mapping, assets_desc, product_type, product_path, lineage):
+def create_stac_doc(product_directory, metadata, mapping, assets_desc, product_type, product_path):
     
     '''
     Creating stac doc based on mapping configuration of project
@@ -15,7 +15,6 @@ def create_stac_doc(product_directory, metadata, mapping, assets_desc, product_t
     :param assets_desc (dict): file content of assets_description.json
     :param product_type (str): product / dataset type
     :param product_path (str): S3 location or URL of product
-    :param lineage (list): list of URLs pointing to location of every file used as input to generate the product
     :return stac_doc (dict): it is the STAC JSON for the input product, compliant with STAC requirements for an item
     '''
     stac_doc = dict()
