@@ -5,7 +5,7 @@ from shapely.geometry import shape
 from hysds_commons.log_utils import logger
 
 
-def create_stac_doc(product_directory, metadata, mapping, assets_desc, product_type, product_path, lineage):
+def create_stac_doc(product_directory, metadata, mapping, assets_desc, product_type, product_path):
     
     '''
     Creating stac doc based on mapping configuration of project
@@ -15,16 +15,27 @@ def create_stac_doc(product_directory, metadata, mapping, assets_desc, product_t
     :param assets_desc (dict): file content of assets_description.json
     :param product_type (str): product / dataset type
     :param product_path (str): S3 location or URL of product
-    :param lineage (list): list of URLs pointing to location of every file used as input to generate the product
     :return stac_doc (dict): it is the STAC JSON for the input product, compliant with STAC requirements for an item
     '''
     stac_doc = dict()
+
+    # set all static/ hardcoded values as defined in value_mappings
+    value_mapping =  mapping.get("value_mappings")
+    for k in value_mapping:
+        # assign value
+        stac_doc[k] = value_mapping.get(k)
 
     # 'field_mappings' Defines a 1:1 mapping between the expected field name in STAC to the 
     # metadata key found in the product's met.json file.
     field_mapping = mapping.get("field_mappings")
     for k in field_mapping:
-        stac_doc[k] = metadata.get(field_mapping.get(k))
+        # check if the value of k is a list
+        if isinstance(field_mapping.get(k), list) and not bool(field_mapping.get(k)):
+            for x in field_mapping.get(k):
+                if metadata.get(x) is not None:
+                    stac_doc[k] = metadata.get(x)
+        else:
+            stac_doc[k] = metadata.get(field_mapping.get(k))
 
     stac_links = []
     # 'code_mappings' derives values for certain STAC fields when they are not straight forward mappings. 
@@ -45,14 +56,16 @@ def create_stac_doc(product_directory, metadata, mapping, assets_desc, product_t
                 stac_links.append(link)
             stac_doc["links"] = stac_links
 
-    # Creating properties. Copy over all the metadata EXCLUDING Properties and Geometry
+    # Creating properties. Copy over all the metadata EXCLUDING ID and Geometry
+    # Function removes id and geometry from mappings file
     properties = copy.deepcopy(metadata)
-    del properties[field_mapping.get("id")]
-    # This try-except block is included because not every product will have bounding polygon
-    try:
-        del properties[field_mapping.get("geometry")]
-    except KeyError:
-        logger.info("Bounding Polygon not found in metadata. Setting to global extent")
+    excluded_fields = mapping.get("excluded_fields")
+    for k in excluded_fields:
+        try:
+            del properties[k]
+        except KeyError:
+            logger.info("Fields cannot be deleted")
+    
     stac_doc["properties"] = properties
 
     # Set geometry, if doesn't exist in product then set to global coordinates
