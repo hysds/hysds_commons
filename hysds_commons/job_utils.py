@@ -51,13 +51,13 @@ def get_hysds_io_params(job_spec):
     """
     hysdsio_params = dict()
     optional_params = set()
-    hysdsio_name = job_spec.replace("job", "hysds-io")
+    hysdsio_name = job_spec.replace("job", "hysds-io", 1)
 
     hysds_io = mozart_es.get_by_id(index="hysds_ios-grq", id=hysdsio_name, ignore=[404])
     if hysds_io["found"] is False:
         hysds_io = mozart_es.get_by_id(index="hysds_ios-mozart", id=hysdsio_name, ignore=[404])
         if hysds_io["found"] is False:
-            return set()
+            raise ValueError("hysds-ios not found: %s" % hysdsio_name)
     params = hysds_io["_source"]["params"]
     for param in params:
         param_name = param["name"]
@@ -162,10 +162,10 @@ def get_inputs(param, kwargs, rule=None, product=None):
         return ret
 
     source = param.get("from", "unknown")
-    ret = param.get("default_value", None)  # Get a value
+    ret = param.get("default", None)  # Get a value TODO: should this be "default" instead?
 
     if source == "submitter":
-        ret = kwargs.get(param.get("name", "unknown"), None)
+        ret = kwargs.get(param.get("name", "unknown"), ret)
     elif source == "passthrough" and not rule is None:
         ret = rule.get(param["name"], None)
     elif source.startswith("dataset_jpath:") and not product is None:
