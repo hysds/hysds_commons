@@ -162,7 +162,7 @@ def get_inputs(param, kwargs, rule=None, product=None):
         return ret
 
     source = param.get("from", "unknown")
-    ret = param.get("default", None)  # Get a value TODO: should this be "default" instead?
+    ret = param.get("default", None)  # Get a value
 
     if source == "submitter":
         ret = kwargs.get(param.get("name", "unknown"), ret)
