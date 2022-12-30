@@ -24,7 +24,51 @@ jobs:
           path: test-reports
 
       - store_artifacts:
-          path: test-reports    
+          path: test-reports
+
+  build:
+    docker:
+      - image: circleci/python:3.9
+        auth:
+          username: $DOCKER_USER
+          password: $DOCKER_PASS
+    steps:
+      - checkout
+      - run:
+          name: Install dependencies
+          command: |
+            sudo apt install iproute2
+            pip install pytest==7.2.0
+            pip install .
+      - run:
+          name: pytest
+          command: |
+            pytest .
+  publish-pypi:
+    docker:
+      - image: circleci/python:3.9
+        auth:
+          username: $DOCKER_USER
+          password: $DOCKER_PASS
+    steps:
+      - checkout
+      - run:
+          name: Init .pypirc
+          command: |
+            echo -e "[pypi]" >> ~/.pypirc
+            echo -e "repository: https://upload.pypi.org/legacy/" >> ~/.pypirc
+            echo -e "username: $PYPI_USER" >> ~/.pypirc
+            echo -e "password: $PYPI_PASSWORD" >> ~/.pypirc
+      - run:
+          name: Install tools
+          command: |
+            pip install twine==4.0.2
+      - run:
+          name: Install and publish to PyPI
+          command: |
+            pip install .
+            python setup.py sdist bdist_wheel
+            twine upload dist/* --verbose --config-file ~/.pypirc
 
 
 workflows:
@@ -35,6 +79,7 @@ workflows:
           context:
             - docker-hub-creds
             - git-oauth-token
+
   weekly:
     triggers:
       - schedule:
@@ -51,3 +96,22 @@ workflows:
           filters:
             branches:
               only: develop
+
+  build-and-deploy:
+    jobs:
+      - build:
+          context:
+            - docker-hub-creds
+            - git-oauth-token
+            - pypi-creds
+      - publish-pypi:
+          context:
+            - docker-hub-creds
+            - git-oauth-token
+          requires:
+            - build
+          filters:
+            tags:
+              only: /[0-9]+(\.[0-9]+)*/
+            branches:
+              ignore: /.*/
