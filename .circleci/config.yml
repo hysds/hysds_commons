@@ -28,7 +28,7 @@ jobs:
 
   build:
     docker:
-      - image: circleci/python:3.9
+      - image: cimg/python:3.9
         auth:
           username: $DOCKER_USER
           password: $DOCKER_PASS
@@ -46,7 +46,7 @@ jobs:
             pytest .
   publish-pypi:
     docker:
-      - image: circleci/python:3.9
+      - image: cimg/python:3.9
         auth:
           username: $DOCKER_USER
           password: $DOCKER_PASS
