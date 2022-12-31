@@ -37,6 +37,7 @@ jobs:
       - run:
           name: Install dependencies
           command: |
+            sudo apt update -y
             sudo apt install iproute2
             pip install pytest==7.2.0
             pip install .
