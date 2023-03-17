@@ -64,6 +64,57 @@ class ElasticsearchUtility:
             self.logger.exception(e) if self.logger else print(e)
             raise e
 
+    def search_by_id(self, **kwargs):
+        """
+        similar to get_by_id, but this uses the _search API and can be used on aliases w/ multiple indices
+        https://elasticsearch-py.readthedocs.io/en/master/api.html#elasticsearch.Elasticsearch.search
+        @param kwargs:
+            - _id: Str, ES document id
+            - index: Str, ES index or alias
+            - return_all: Bool, if there are more than one records returned
+                List[Dict] if True, else returns Dict of the latest record
+        @return: Dict or List[Dict]
+        """
+        _id = kwargs.pop("id", None)
+        if not _id:
+            raise RuntimeError("_id key argument must be supplied")
+        index = kwargs.get("index", None)
+        if not index:
+            raise RuntimeError("index key argument must be supplied")
+
+        ignore = kwargs.get("ignore", None)
+        kwargs["sort"] = "@timestamp:desc"
+
+        return_all = kwargs.pop("return_all", False)
+
+        kwargs["body"] = {
+            "query": {
+                "bool": {
+                    "must": [
+                        {"term": {"_id": _id}}
+                    ]
+                }
+            }
+        }
+        docs = self.es.search(**kwargs)
+        hits = docs["hits"]["hits"]
+        if len(hits) == 0:
+            if (type(ignore) is list and 404 in ignore) or (type(ignore) is int and ignore == 404):
+                not_found_doc = {
+                    "_index": index,
+                    "_type": "_doc",
+                    "_id": _id,
+                    "found": False
+                }
+                return [not_found_doc] if return_all is True else not_found_doc
+            err = f"{_id} not found on index/alias {index}"
+            self.logger.error(err) if self.logger else print(err)
+            raise NotFoundError(404, err)
+
+        for hit in hits:
+            hit["found"] = True  # adding "found" to match get_by_id
+        return hits if return_all is True else hits[0]
+
     def _pit(self, **kwargs):
         """
         using the PIT (point-in-time) + search_after API to do deep pagination
