@@ -83,7 +83,7 @@ class ElasticsearchUtility:
             raise RuntimeError("index key argument must be supplied")
 
         ignore = kwargs.get("ignore", None)
-        kwargs["sort"] = "@timestamp:desc"
+        kwargs["sort"] = kwargs.get("sort", "@timestamp:desc")
 
         return_all = kwargs.pop("return_all", False)
 
