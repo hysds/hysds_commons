@@ -365,7 +365,7 @@ def resolve_mozart_job(product, rule, hysdsio=None, queue=None, component=None):
 
 def resolve_hysds_job(job_type=None, queue=None, priority=None, tags=None, params=None, job_name=None,
                       payload_hash=None, enable_dedup=True, username=None, soft_time_limit=None, time_limit=None,
-                      disk_usage=None):
+                      disk_usage=None, publish_override_ok=False):
     """
     Resolve HySDS job JSON.
     @param job_type - type of the job spec to go find
@@ -380,6 +380,7 @@ def resolve_hysds_job(job_type=None, queue=None, priority=None, tags=None, param
     @param soft_time_limit - soft time limit for job execution
     @param time_limit - hard time limit for job execution
     @param disk_usage - disk usage for PGE (KB, MB, GB, etc)
+    @param publish_override_ok - enable a job to override an existing dataset on publish
     """
     if job_type is None:
         raise RuntimeError("'type' must be supplied in request")
@@ -457,6 +458,7 @@ def resolve_hysds_job(job_type=None, queue=None, priority=None, tags=None, param
         "soft_time_limit": soft_time_limit,
         "disk_usage": disk_usage,
         "enable_dedup": enable_dedup,
+        "publish_override_ok": publish_override_ok,
         "payload": {
             "_command": cmd,
             "localize_urls": localize_urls,
