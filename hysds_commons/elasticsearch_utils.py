@@ -290,8 +290,6 @@ class ElasticsearchUtility:
             ignore - will not raise error if status code is specified (ex. 404, [400, 404])
         """
         try:
-            if self.logger:
-                self.logger.info("query **kwargs: {}".format(dict(**kwargs)))
             result = self.es.delete(**kwargs)
             return result
         except NotFoundError as e:
@@ -317,8 +315,6 @@ class ElasticsearchUtility:
             ignore - will not raise error if status code is specified (ex. 404, [400, 404])
         """
         try:
-            if self.logger:
-                self.logger.info("update_document **kwargs".format(dict(**kwargs)))
             result = self.es.update(**kwargs)
             return result
         except RequestError as e:
@@ -327,28 +323,3 @@ class ElasticsearchUtility:
         except (ElasticsearchException, Exception) as e:
             self.logger.exception(e) if self.logger else print(e)
             raise e
-
-
-# TODO: remove all code that uses this function
-def get_es_scrolled_data(es_url, index, query):
-    es = elasticsearch.Elasticsearch([es_url])
-
-    documents = []
-    page = es.search(index=index, scroll="2m", size=100, body=query)
-
-    sid = page["_scroll_id"]
-    documents.extend(page["hits"]["hits"])
-    page_size = page["hits"]["total"]["value"]
-
-    # Start scrolling
-    while page_size > 0:
-        page = es.scroll(scroll_id=sid, scroll="2m")
-
-        # Update the scroll ID
-        sid = page["_scroll_id"]
-        scroll_document = page["hits"]["hits"]
-
-        # Get the number of results that we returned in the last scroll
-        page_size = len(scroll_document)
-        documents.extend(scroll_document)
-    return documents
