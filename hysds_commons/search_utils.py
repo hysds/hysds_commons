@@ -202,7 +202,7 @@ class SearchUtility(ABC):
         total = data["hits"]["total"]["value"]
 
         if total >= page_limit:
-            if self.version is None:
+            if self.engine == "elasticsearch" and self.version is None:
                 self.set_version()
             if self.engine == "opensearch" or self.version >= version.parse("7.10"):
                 return self._pit(**kwargs)
