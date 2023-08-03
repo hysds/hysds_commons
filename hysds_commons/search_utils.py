@@ -23,7 +23,6 @@ class SearchUtility(ABC):
         version_info = es_info["version"]
         version_number = version_info["number"]
         self.version = version.parse(version_number)
-        self.engine = version_info.get("distribution", "elasticsearch")
 
     def index_document(self, **kwargs):
         """
