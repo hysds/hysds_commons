@@ -7,6 +7,9 @@ standard_library.install_aliases()
 
 from abc import ABC
 from packaging import version
+import warnings
+
+warnings.simplefilter('always', UserWarning)
 
 
 class SearchUtility(ABC):
@@ -14,6 +17,7 @@ class SearchUtility(ABC):
         self.es = None
         self.version = None
         self.engine = None
+        self.flavor = None
 
     def set_version(self):
         """
@@ -23,6 +27,7 @@ class SearchUtility(ABC):
         version_info = es_info["version"]
         version_number = version_info["number"]
         self.version = version.parse(version_number)
+        self.flavor = version_info.get("build_flavor", "default")
 
     def index_document(self, **kwargs):
         """
@@ -107,13 +112,14 @@ class SearchUtility(ABC):
             * index is required when using the search_after API
         :return: List[any]
         """
+        if not self.flavor:
+            self.set_version()
+
         keep_alive = "2m"
         body = kwargs.pop("body", {})
         index = kwargs.pop("index", body.pop("index", None))
         if index is None:
             raise RuntimeError("ElasticsearchUtility._pit: the search_after API must specify a index/alias")
-
-        pit = self.es.open_point_in_time(index=index, keep_alive=keep_alive)
 
         size = kwargs.get("size", body.get("size"))
         if not size:
@@ -123,10 +129,15 @@ class SearchUtility(ABC):
         if not sort:
             body["sort"] = [{"@timestamp": "desc"}, {"id.keyword": "asc"}]
 
-        body = {
-            **body,
-            **{"pit": {**pit, **{"keep_alive": keep_alive}}},
-        }
+        pit = None
+        if self.flavor != "oss":
+            pit = self.es.open_point_in_time(index=index, keep_alive=keep_alive)
+            body = {
+                **body,
+                **{"pit": {**pit, **{"keep_alive": keep_alive}}},
+            }
+        else:
+            warnings.warn("Elasticsearch OSS does not support _pit, will use search_after without _pit...")
         res = self.es.search(body=body, **kwargs)
 
         records = []
@@ -138,7 +149,8 @@ class SearchUtility(ABC):
             body["search_after"] = last_record["sort"]
             res = self.es.search(body=body, **kwargs)
 
-        self.es.close_point_in_time(body=pit)
+        if pit:
+            self.es.close_point_in_time(body=pit)
         return records
 
     def _scroll(self, **kwargs):
@@ -203,7 +215,7 @@ class SearchUtility(ABC):
         if total >= page_limit:
             if self.engine == "elasticsearch" and self.version is None:
                 self.set_version()
-            if self.engine == "opensearch" or self.version >= version.parse("7.10"):
+            if self.engine == "opensearch" or (self.version >= version.parse("7.10") and self.flavor != "oss"):
                 return self._pit(**kwargs)
             else:
                 kwargs["scroll"] = scroll
