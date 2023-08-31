@@ -12,7 +12,7 @@ from elasticsearch.exceptions import NotFoundError, RequestError, ElasticsearchE
 
 class ElasticsearchUtility:
     def __init__(self, es_url, logger=None, **kwargs):
-        self.es = elasticsearch.Elasticsearch(hosts=[es_url], **kwargs)
+        self.es = elasticsearch.Elasticsearch(hosts=es_url if type(es_url) == list else [es_url], **kwargs)
         self.es_url = es_url
         self.logger = logger
         self.version = None
