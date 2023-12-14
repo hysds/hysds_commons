@@ -106,7 +106,8 @@ def iterate(component, rule):
     if duplicate_ids:
         logger.info(f"List of duplicate IDs: {duplicate_ids}")
         raise Exception(f"found duplicate IDs in result set: {duplicate_ids}")
-
+    else:
+        logger.info(f"dictionary of unique_results:\n{unique_results}")
 
     # What to iterate for submission
     submission_iterable = [{"_id": "Global Single Submission"}] if single else results
