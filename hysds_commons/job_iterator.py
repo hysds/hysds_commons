@@ -88,25 +88,6 @@ def iterate(component, rule):
         else:
             results = grq_es.query(index=es_index, body=queryobj, sort=sort)
 
-    unique_results = {}
-    for result in results:
-        id = result.get("_id")
-        if id in unique_results:
-            unique_results[id] += 1
-        else:
-            unique_results[id] = 1
-
-    duplicate_ids = list()
-    for key, value in unique_results.items():
-        if value > 1:
-            duplicate_ids.append(key)
-
-    if duplicate_ids:
-        logger.info(f"List of duplicate IDs: {duplicate_ids}")
-        raise Exception(f"found duplicate IDs in result set: {duplicate_ids}")
-    else:
-        logger.info(f"dictionary of unique_results:\n{unique_results}")
-
     # What to iterate for submission
     submission_iterable = [{"_id": "Global Single Submission"}] if single else results
 
