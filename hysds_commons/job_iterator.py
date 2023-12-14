@@ -81,12 +81,14 @@ def iterate(component, rule):
 
     # Run the query to get the products; for efficiency, run query only if we need the results
     results = [{"_id": "Transient Faux-Results"}]
-    sort = ["@timestamp:desc", "id.keyword:asc"]
+    #sort = ["@timestamp:desc", "id.keyword:asc"]
     if run_query:
         if component == "mozart" or component == "figaro":
-            results = mozart_es.query(index=es_index, body=queryobj, sort=sort)
+            results = mozart_es.query(index=es_index, body=queryobj)
+            # results = mozart_es.query(index=es_index, body=queryobj, sort=sort)
         else:
-            results = grq_es.query(index=es_index, body=queryobj, sort=sort)
+            results = grq_es.query(index=es_index, body=queryobj)
+            # results = grq_es.query(index=es_index, body=queryobj, sort=sort)
 
     unique_results = {}
     for result in results:
