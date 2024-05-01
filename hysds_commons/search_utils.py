@@ -86,7 +86,8 @@ class SearchUtility(ABC):
             }
         }
         docs = self.es.search(**kwargs)
-        hits = docs["hits"]["hits"]
+
+        hits = docs.get("hits", {}).get("hits", [])
         if len(hits) == 0:
             if (type(ignore) is list and 404 in ignore) or (type(ignore) is int and ignore == 404):
                 not_found_doc = {
