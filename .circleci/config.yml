@@ -12,8 +12,6 @@ jobs:
           name: Test
           command: |
             source $HOME/verdi/bin/activate
-            sudo yum -y update
-            sudo yum -y install gcc
             cp $HOME/verdi/ops/hysds/configs/celery/celeryconfig.py.tmpl $HOME/verdi/ops/hysds/celeryconfig.py
             pip install -U pytest jsonschema
             pip install -e .
