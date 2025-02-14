@@ -22,9 +22,9 @@ setup(
     include_package_data=True,
     zip_safe=False,
     install_requires=[
-        'elasticsearch>=7.0.0,<7.14.0',
-        # Pin numpy since Cartopy (grq2) and ElasticSearch are not compatible with > 2.0
-        'numpy<2.0.0',
+        'elasticsearch>=7.0.0,<8.0.0',
+        # Pin numpy due to ES incompatability: https://github.com/elastic/elasticsearch-py/issues/2646
+        #'numpy<2.0.0',
         'opensearch-py>=2.3.0,<3.0.0',
         'requests>=2.7.0',
         'future>=0.17.1',
