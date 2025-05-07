@@ -17,6 +17,7 @@ class OpenSearchUtility(SearchUtility):
                              verify_certs=False,
                              ssl_assert_hostname=False,
                              ssl_show_warn=False,
+                             auth=self.get_creds(creds_entry="Opensearch-ops"),
                              **kwargs)
         self.version = None
         self.engine = "opensearch"

@@ -12,11 +12,11 @@ from hysds_commons.search_utils import SearchUtility
 class ElasticsearchUtility(SearchUtility):
     def __init__(self, host, **kwargs):
         super().__init__(host)
+        # No ssl=true parameter for Elasticsearch client. Need to ensure "https" in host url(s)
         self.es = Elasticsearch(hosts=host if type(host) == list else [host],
-                                use_ssl=True,
                                 verify_certs=False,
-                                ssl_assert_hostname=False,
                                 ssl_show_warn=False,
+                                basic_auth=self.get_creds(creds_entry="Elasticsearch-ops"),
                                 **kwargs)
         self.version = None
         self.engine = "elasticsearch"

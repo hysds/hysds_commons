@@ -7,6 +7,12 @@ standard_library.install_aliases()
 
 from abc import ABC
 from packaging import version
+from pathlib import Path
+import logging
+import os
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger("search_utils")
+import netrc
 import warnings
 
 warnings.simplefilter('always', UserWarning)
@@ -289,3 +295,25 @@ class SearchUtility(ABC):
             ignore - will not raise error if status code is specified (ex. 404, [400, 404])
         """
         return self.es.update(**kwargs)
+
+    def file_is_0600(self, filename):
+        """Check that a file has 0600 permissions (read/write for user only)."""
+        return oct(Path(filename).stat().st_mode)[-4:] == "0600"
+
+    def get_creds(self, creds_entry, path="~/.creds"):
+        """Extract a username/password tuple from the entry creds_entry in netrc file provided in path.
+        Updates credential file permissions to 600 if needed to keep them secure."""
+        netrc_file = Path(path).expanduser()
+        n = netrc.netrc(netrc_file)
+        has_correct_permission = self.file_is_0600(netrc_file)
+
+        if not has_correct_permission:
+            logger.error("Your ~/.creds file does not have the correct permissions: 0600 (r/w for user only. "
+                         "Attempting to chmod")
+            os.chmod(netrc_file, 0o600)
+
+        credentials = n.authenticators(creds_entry)
+        if credentials is not None:
+            return credentials[0], credentials[2]
+        else:
+            raise KeyError("Unable to extract OpenSearch credentials from %s for %s", path, creds_entry)
