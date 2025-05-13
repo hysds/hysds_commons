@@ -300,7 +300,7 @@ class SearchUtility(ABC):
         """Check that a file has 0600 permissions (read/write for user only)."""
         return oct(Path(filename).stat().st_mode)[-4:] == "0600"
 
-    def get_creds(self, creds_entry, path="~/.creds"):
+    def get_creds(self, creds_entry, path="~/.netrc-os"):
         """Extract a username/password tuple from the entry creds_entry in netrc file provided in path.
         Updates credential file permissions to 600 if needed to keep them secure."""
         netrc_file = Path(path).expanduser()
@@ -308,8 +308,8 @@ class SearchUtility(ABC):
         has_correct_permission = self.file_is_0600(netrc_file)
 
         if not has_correct_permission:
-            logger.error("Your ~/.creds file does not have the correct permissions: 0600 (r/w for user only. "
-                         "Attempting to chmod")
+            logger.error("Your %s file does not have the correct permissions: 0600 (r/w for user only. "
+                         "Attempting to chmod", path)
             os.chmod(netrc_file, 0o600)
 
         credentials = n.authenticators(creds_entry)

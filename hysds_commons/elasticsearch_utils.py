@@ -16,7 +16,7 @@ class ElasticsearchUtility(SearchUtility):
         self.es = Elasticsearch(hosts=host if type(host) == list else [host],
                                 verify_certs=False,
                                 ssl_show_warn=False,
-                                basic_auth=self.get_creds(creds_entry="Elasticsearch-ops"),
+                                basic_auth=self.get_creds(creds_entry="hysdsops"),
                                 **kwargs)
         self.version = None
         self.engine = "elasticsearch"
