@@ -6,6 +6,7 @@ from future import standard_library
 standard_library.install_aliases()
 
 from opensearchpy import OpenSearch
+from opensearchpy import RequestsHttpConnection as RequestsHttpConnectionOS
 from hysds_commons.search_utils import SearchUtility
 
 
@@ -17,6 +18,7 @@ class OpenSearchUtility(SearchUtility):
                              verify_certs=False,
                              ssl_assert_hostname=False,
                              ssl_show_warn=False,
+                             connection_class=RequestsHttpConnectionOS,
                              http_auth=self.get_creds(creds_entry="default"),
                              **kwargs)
         self.version = None
