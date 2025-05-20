@@ -15,11 +15,10 @@ class ElasticsearchUtility(SearchUtility):
         super().__init__(host)
         # No ssl=true parameter for Elasticsearch client. Need to ensure "https" in host url(s)
         self.es = Elasticsearch(hosts=host if type(host) == list else [host],
-#                                verify_certs=False,
+                                verify_certs=False,
                                 ssl_show_warn=False,
                                 connection_class=RequestsHttpConnectionES,
                                 basic_auth=self.get_creds(creds_entry="default"),
-                                ca_certs="/etc/pki/tls/certs/ca-bundle.crt",
                                 **kwargs)
         self.version = None
         self.engine = "elasticsearch"

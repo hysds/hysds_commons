@@ -15,12 +15,11 @@ class OpenSearchUtility(SearchUtility):
         super().__init__(host)
         self.es = OpenSearch(hosts=host if type(host) == list else [host],
                              use_ssl=True,
-#                             verify_certs=False,
+                             verify_certs=False,
                              ssl_assert_hostname=False,
                              ssl_show_warn=False,
                              connection_class=RequestsHttpConnectionOS,
                              http_auth=self.get_creds(creds_entry="default"),
-                             ca_certs="/etc/pki/tls/certs/ca-bundle.crt",
                              **kwargs)
         self.version = None
         self.engine = "opensearch"
