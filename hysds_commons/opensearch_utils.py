@@ -20,6 +20,7 @@ class OpenSearchUtility(SearchUtility):
                              ssl_show_warn=False,
                              connection_class=RequestsHttpConnectionOS,
                              http_auth=self.get_creds(creds_entry="default"),
+                             ca_certs="/etc/pki/tls/certs/ca-bundle.crt"
                              **kwargs)
         self.version = None
         self.engine = "opensearch"
