@@ -4,21 +4,27 @@ from __future__ import division
 from __future__ import absolute_import
 from future import standard_library
 standard_library.install_aliases()
-
+import ssl
 from opensearchpy import OpenSearch
 from opensearchpy import RequestsHttpConnection as RequestsHttpConnectionOS
+from opensearchpy.connection import create_ssl_context
 from hysds_commons.search_utils import SearchUtility
 
 
 class OpenSearchUtility(SearchUtility):
     def __init__(self, host, **kwargs):
         super().__init__(host)
+
+        context = create_ssl_context()
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_NONE
+
         self.es = OpenSearch(hosts=host if type(host) == list else [host],
                              use_ssl=True,
                              verify_certs=False,
                              ssl_assert_hostname=False,
                              ssl_show_warn=False,
-                             connection_class=RequestsHttpConnectionOS,
+                             ssl_context=context,
                              http_auth=self.get_creds(creds_entry="default"),
                              **kwargs)
         self.version = None

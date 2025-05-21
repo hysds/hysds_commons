@@ -4,20 +4,25 @@ from __future__ import division
 from __future__ import absolute_import
 from future import standard_library
 standard_library.install_aliases()
-
+import ssl
 from elasticsearch import Elasticsearch
-from elasticsearch import RequestsHttpConnection as RequestsHttpConnectionES
+from elasticsearch.connection import create_ssl_context
 from hysds_commons.search_utils import SearchUtility
 
 
 class ElasticsearchUtility(SearchUtility):
     def __init__(self, host, **kwargs):
         super().__init__(host)
+
+        context = create_ssl_context()
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_NONE
+
         # No ssl=true parameter for Elasticsearch client. Need to ensure "https" in host url(s)
         self.es = Elasticsearch(hosts=host if type(host) == list else [host],
                                 verify_certs=False,
                                 ssl_show_warn=False,
-                                connection_class=RequestsHttpConnectionES,
+                                ssl_context=context,
                                 basic_auth=self.get_creds(creds_entry="default"),
                                 **kwargs)
         self.version = None
