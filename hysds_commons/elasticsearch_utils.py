@@ -14,15 +14,11 @@ class ElasticsearchUtility(SearchUtility):
     def __init__(self, host, **kwargs):
         super().__init__(host)
 
-        context = create_ssl_context()
-        context.check_hostname = False
-        context.verify_mode = ssl.CERT_NONE
 
         # No ssl=true parameter for Elasticsearch client. Need to ensure "https" in host url(s)
         self.es = Elasticsearch(hosts=host if type(host) == list else [host],
                                 verify_certs=False,
                                 ssl_show_warn=False,
-                                ssl_context=context,
                                 basic_auth=self.get_creds(creds_entry="default"),
                                 **kwargs)
         self.version = None

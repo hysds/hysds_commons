@@ -15,16 +15,11 @@ class OpenSearchUtility(SearchUtility):
     def __init__(self, host, **kwargs):
         super().__init__(host)
 
-        context = create_ssl_context()
-        context.check_hostname = False
-        context.verify_mode = ssl.CERT_NONE
-
         self.es = OpenSearch(hosts=host if type(host) == list else [host],
                              use_ssl=True,
                              verify_certs=False,
                              ssl_assert_hostname=False,
                              ssl_show_warn=False,
-                             ssl_context=context,
                              http_auth=self.get_creds(creds_entry="default"),
                              **kwargs)
         self.version = None
