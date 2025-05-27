@@ -317,3 +317,76 @@ class SearchUtility(ABC):
             return credentials[0], credentials[2]
         else:
             raise KeyError("Unable to extract OpenSearch credentials from %s for %s", path, creds_entry)
+
+class JitteredBackoffException(Exception):
+    pass
+
+
+class JitteredBackoffHandler:
+    def __init__(self, max_value, max_time, logger):
+        self.max_value = max_value
+        self.max_time = max_time
+        self.logger = logger
+
+    def log_backoff(self, details):
+        if self.logger is not None:
+            self.logger.error(
+                "Backing off {wait:0.1f} seconds after {tries} tries " "calling function {target} with args {args} and kwargs " "{kwargs}".format(**details)
+            )
+
+    def log_giveup(self, details):
+        if self.logger is not None:
+            self.logger.error(f"Giving up after {details['tries']} tries due to {details['value']}")
+
+    def backoff_wrapper(self, func, *args, **kwargs):
+        @backoff.on_exception(
+            backoff.expo,
+            Exception,
+            max_value=self.max_value,
+            max_time=self.max_time,
+            jitter=backoff.full_jitter,
+            on_backoff=self.log_backoff,
+            on_giveup=self.log_giveup,
+        )
+        def wrapper(*args, **kwargs):
+            try:
+                return func(*args, **kwargs)
+            except Exception as e:
+                if self.logger is not None:
+                    self.logger.error(f"Exception occurred: {str(e)}")
+                raise JitteredBackoffException(f"Exception occurred: {str(e)}") from e
+
+        return wrapper
+
+
+def jittered_backoff_class_factory(base_conn_class):
+    class JitteredBackoffConnection(base_conn_class):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.max_value = kwargs.get("max_value", 13)
+            self.max_time = kwargs.get("max_time", 34)
+            self.logger = kwargs.get("logger", None)
+            self.backoff_handler = JitteredBackoffHandler(self.max_value, self.max_time, self.logger)
+            self.backoff_wrapped_func = self.backoff_handler.backoff_wrapper(super().perform_request)
+
+        def perform_request(
+            self,
+            method,
+            url,
+            params=None,
+            body=None,
+            timeout=None,
+            ignore=(),
+            headers=None,
+        ):
+            return self.backoff_wrapped_func(
+                method,
+                url,
+                params=params,
+                body=body,
+                timeout=timeout,
+                ignore=ignore,
+                headers=headers,
+            )
+
+    return JitteredBackoffConnection

@@ -4,10 +4,10 @@ from __future__ import division
 from __future__ import absolute_import
 from future import standard_library
 standard_library.install_aliases()
-import ssl
 from opensearchpy import OpenSearch
 from opensearchpy import RequestsHttpConnection as RequestsHttpConnectionOS
-from opensearchpy.connection import create_ssl_context
+from search_utils import jittered_backoff_class_factory
+from hysds_commons.log_utils import logger
 from hysds_commons.search_utils import SearchUtility
 
 
@@ -19,6 +19,12 @@ class OpenSearchUtility(SearchUtility):
                              use_ssl=True,
                              verify_certs=False,
                              ssl_assert_hostname=False,
+                             connection_class=jittered_backoff_class_factory(RequestsHttpConnectionOS),
+                             connection_class_params={
+                                 "max_value": 13,
+                                 "max_time": 34,
+                                 "logger": logger,
+                             },
                              ssl_show_warn=False,
                              http_auth=self.get_creds(creds_entry="default"),
                              **kwargs)
