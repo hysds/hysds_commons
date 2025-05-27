@@ -3,13 +3,13 @@ from __future__ import print_function
 from __future__ import division
 from __future__ import absolute_import
 from future import standard_library
-standard_library.install_aliases()
 from opensearchpy import OpenSearch
 from opensearchpy import RequestsHttpConnection as RequestsHttpConnectionOS
-from search_utils import jittered_backoff_class_factory
+from hysds_commons.search_utils import jittered_backoff_class_factory
 from hysds_commons.log_utils import logger
 from hysds_commons.search_utils import SearchUtility
 
+standard_library.install_aliases()
 
 class OpenSearchUtility(SearchUtility):
     def __init__(self, host, **kwargs):

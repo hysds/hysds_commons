@@ -6,7 +6,7 @@ from future import standard_library
 standard_library.install_aliases()
 from elasticsearch import Elasticsearch
 from elasticsearch import RequestsHttpConnection as RequestsHttpConnectionES
-from search_utils import jittered_backoff_class_factory
+from hysds_commons.search_utils import jittered_backoff_class_factory
 from hysds_commons.log_utils import logger
 from hysds_commons.search_utils import SearchUtility
 
