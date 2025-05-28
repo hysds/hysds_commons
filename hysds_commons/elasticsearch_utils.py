@@ -26,7 +26,7 @@ class ElasticsearchUtility(SearchUtility):
                                     "max_time": 34,
                                     "logger": logger,
                                 },
-                                basic_auth=self.get_creds(creds_entry="default"),
+                                http_auth=self.get_creds(creds_entry="default"),
                                 **kwargs)
         self.version = None
         self.engine = "elasticsearch"
