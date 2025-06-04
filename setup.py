@@ -1,7 +1,3 @@
-from __future__ import unicode_literals
-from __future__ import print_function
-from __future__ import division
-from __future__ import absolute_import
 from setuptools import setup, find_packages
 import hysds_commons
 
@@ -21,6 +17,7 @@ setup(
     packages=find_packages(),
     include_package_data=True,
     zip_safe=False,
+    python_requires='>=3.12',
     install_requires=[
         'elasticsearch>=7.0.0,<7.14.0',
         # Pin numpy due to ES incompatability: https://github.com/elastic/elasticsearch-py/issues/2646
@@ -37,11 +34,7 @@ setup(
         "Intended Audience :: Science/Research",
         "License :: OSI Approved :: Apache Software License",
         "Programming Language :: Python :: 3 :: Only",
-        "Programming Language :: Python :: 3.5",
-        "Programming Language :: Python :: 3.6",
-        "Programming Language :: Python :: 3.7",
-        "Programming Language :: Python :: 3.8",
-        "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.12",
         "Operating System :: POSIX :: Linux",
         "Operating System :: Unix",
         "Operating System :: MacOS :: MacOS X",

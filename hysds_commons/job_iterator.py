@@ -1,9 +1,4 @@
 #!/bin/env python
-from __future__ import unicode_literals
-from __future__ import print_function
-from __future__ import division
-from __future__ import absolute_import
-from builtins import str
 from future import standard_library
 standard_library.install_aliases()
 
@@ -76,7 +71,7 @@ def iterate(component, rule):
     # Do we need the results
     run_query = False if single else True
     if not run_query:  # check if we need the results anyway
-        run_query = any((i["from"].startswith('dataset_jpath') for i in hysdsio["params"]))
+        run_query = any(i["from"].startswith('dataset_jpath') for i in hysdsio["params"])
     logger.info("run_query: %s" % run_query)
 
     # Run the query to get the products; for efficiency, run query only if we need the results
@@ -103,7 +98,7 @@ def iterate(component, rule):
             if job_type.startswith('hysds-io-'):
                 job_type = job_type.replace('hysds-io-', '', 1)
             if isinstance(product, dict):
-                job_name = "%s-%s" % (job_type, product.get('_id', 'unknown'))
+                job_name = "{}-{}".format(job_type, product.get('_id', 'unknown'))
             else:
                 job_name = "%s-single_submission" % job_type
 
@@ -118,10 +113,10 @@ def iterate(component, rule):
             error_count = error_count + 1
             if not str(e) in errors:
                 errors.append(str(e))
-            logger.warning("Failed to submit jobs: {0}:{1}".format(type(e), str(e)))
+            logger.warning(f"Failed to submit jobs: {type(e)}:{str(e)}")
             logger.warning(traceback.format_exc())
 
     if error_count > 0:
-        logger.error("Failed to submit: {0} of {1} jobs. {2}".format(
+        logger.error("Failed to submit: {} of {} jobs. {}".format(
             error_count, len(list(results)), " ".join(errors)))
         raise Exception("Job Submitter Job failed to submit all actions")

@@ -5,12 +5,12 @@ import logging
 
 schema_file = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                            '../../schemas/job-spec-schema.json')
-with open(schema_file, 'r') as f:
+with open(schema_file) as f:
     schema_data = json.load(f)
 
 
 def __validate(file):
-    with open(file, 'r') as f:
+    with open(file) as f:
         data = json.load(f)
     validator = jsonschema.Draft7Validator(schema_data)
     errors = sorted(validator.iter_errors(data), key=lambda e: e.path)
