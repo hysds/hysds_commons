@@ -1,7 +1,3 @@
-from __future__ import unicode_literals
-from __future__ import print_function
-from __future__ import division
-from __future__ import absolute_import
 from future import standard_library
 standard_library.install_aliases()
 
@@ -24,10 +20,10 @@ def single_process_and_submission(mozart_url, product, rule, hysdsio=None, queue
 
     # resolve job
     job = resolve_mozart_job(product, rule, hysdsio, queue, component)
-    logger.info("resolved job: {}".format(json.dumps(job, indent=2)))
+    logger.info(f"resolved job: {json.dumps(job, indent=2)}")
 
     # submit job
     res = submit_job(mozart_url, job)
-    logger.info("submitted job to {}".format(mozart_url))
+    logger.info(f"submitted job to {mozart_url}")
 
     return res

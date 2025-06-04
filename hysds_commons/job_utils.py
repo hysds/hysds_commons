@@ -1,9 +1,3 @@
-from __future__ import unicode_literals
-from __future__ import print_function
-from __future__ import division
-from __future__ import absolute_import
-from builtins import dict
-from builtins import int
 from future import standard_library
 standard_library.install_aliases()
 
@@ -144,7 +138,7 @@ def run_lambda(wire, val):
             fn = eval(wire["lambda"], namespace, {})
             val = fn(val)
         except Exception as e:
-            raise RuntimeError("[ERROR] Failed to run lambda function to fill {0}. {1}:{2}".format(
+            raise RuntimeError("[ERROR] Failed to run lambda function to fill {}. {}:{}".format(
                 wire["name"], type(e), e))
     return val
 
@@ -178,7 +172,7 @@ def get_inputs(param, kwargs, rule=None, product=None):
 
     # Check value is found
     if ret is None and not (product is None) and not (rule is None):
-        raise RuntimeError("Failed to find '{0}' input from '{1}'".format(param.get("name", "unknown"), source))
+        raise RuntimeError("Failed to find '{}' input from '{}'".format(param.get("name", "unknown"), source))
     return ret
 
 
@@ -230,7 +224,7 @@ def match_inputs(param, context):
 
     # Check value is found
     if param["value"] is None:
-        raise RuntimeError("Failed to find '{0}' input from '{1}'".format(param.get("name", "unknown"), source))
+        raise RuntimeError("Failed to find '{}' input from '{}'".format(param.get("name", "unknown"), source))
 
 
 def fill_localize(value, localize_urls):
@@ -252,7 +246,7 @@ def fill_localize(value, localize_urls):
         localize_urls.append(value)
     # Other types of objects must throw an error
     elif not getattr(value, "get", None) is None:
-        raise ValueError("Invalid object of type {0} trying to be localized. {1}".format(type(value), value))
+        raise ValueError(f"Invalid object of type {type(value)} trying to be localized. {value}")
     # Handle lists and other iterables by recursing
     else:
         for val in value:
@@ -294,10 +288,10 @@ def get_command_line(command, positional):
     for posit in positional:
         # Escape any single quotes
         if not isinstance(posit, str):
-            posit = "{0}".format(json.dumps(posit))
+            posit = f"{json.dumps(posit)}"
         posit = posit.replace("'", "'\"'\"'")
         # Add in encapsulating single quotes
-        parts.append("'{0}'".format(posit))
+        parts.append(f"'{posit}'")
     ret = " ".join(parts)
     return ret
 
@@ -393,7 +387,7 @@ def resolve_hysds_job(job_type=None, queue=None, priority=None, tags=None, param
     elif isinstance(params, dict):
         pass
     else:
-        raise RuntimeError("Invalid arg type 'params': {} {}".format(type(params), params))
+        raise RuntimeError(f"Invalid arg type 'params': {type(params)} {params}")
 
     # pull mozart job and container specs
     specification = mozart_es.get_by_id(index='job_specs', id=job_type)
@@ -405,7 +399,7 @@ def resolve_hysds_job(job_type=None, queue=None, priority=None, tags=None, param
     container_id = specification.get("container", None)
     container_spec = mozart_es.get_by_id(index='containers', id=container_id)
     container_spec = container_spec['_source']
-    logger.info("Running from: {0} in container: {1}".format(job_type, container_id))
+    logger.info(f"Running from: {job_type} in container: {container_id}")
 
     # resolve inputs/outputs
     positional = []
@@ -416,18 +410,18 @@ def resolve_hysds_job(job_type=None, queue=None, priority=None, tags=None, param
     for param in specification.get("params", []):
         # TODO: change to "check_inputs"
         # match_inputs(param,context)
-        logger.info("param: {}".format(param))
+        logger.info(f"param: {param}")
         if param["name"] not in params:
             default_value = hysdsio_params.get(param["name"], {}).get("default", None)
             if default_value is not None:
-                logger.warning("{0} not found, using default value {1}".format(param["name"], default_value))
+                logger.warning("{} not found, using default value {}".format(param["name"], default_value))
                 param["value"] = run_type_conversion(hysdsio_params[param["name"]], default_value)
             else:
                 if param["name"] in optional_params:
-                    logger.warning("{0} is not supplied but optional, skipping...".format(param["name"]))
+                    logger.warning("{} is not supplied but optional, skipping...".format(param["name"]))
                     continue
                 else:
-                    raise RuntimeError("params must specify '{0}' parameter".format(param["name"]))
+                    raise RuntimeError("params must specify '{}' parameter".format(param["name"]))
         else:
             param["value"] = params[param["name"]]
         route_outputs(param, context, positional, localize_urls)
@@ -448,7 +442,7 @@ def resolve_hysds_job(job_type=None, queue=None, priority=None, tags=None, param
 
     # initialize hysds job JSON
     job = {
-        "job_type": "job:{0}".format(job_type),
+        "job_type": f"job:{job_type}",
         "job_queue": queue,
         "container_image_url": container_spec.get("url", None),
         "container_image_name": container_spec.get("id", None),
@@ -507,7 +501,7 @@ def submit_hysds_job(job):
     # @param params - dictionary representing job params
     """
     queue = 'jobs_processed'
-    logger.info("Submitting job:\n{0}".format(json.dumps(job, indent=2)))
+    logger.info(f"Submitting job:\n{json.dumps(job, indent=2)}")
 
     res = do_submit_job(job, queue)
     logger.info("submitted job to queue: %s" % queue)
@@ -541,7 +535,7 @@ def submit_mozart_job(product, rule, hysdsio=None, queue=None, job_name=None, pa
 
     # resolve mozart job
     moz_job = resolve_mozart_job(product, rule, hysdsio, queue, component=component)
-    logger.info("resolved mozart job: {}".format(json.dumps(moz_job)))
+    logger.info(f"resolved mozart job: {json.dumps(moz_job)}")
 
     # resolve hysds job
     job = resolve_hysds_job(job_type=moz_job['type'],
@@ -555,7 +549,7 @@ def submit_mozart_job(product, rule, hysdsio=None, queue=None, job_name=None, pa
                             username=moz_job['username'],
                             soft_time_limit=moz_job['soft_time_limit'], time_limit=moz_job['time_limit'],
                             disk_usage=moz_job['disk_usage'])
-    logger.info("resolved HySDS job: {}".format(json.dumps(job, indent=2)))
+    logger.info(f"resolved HySDS job: {json.dumps(job, indent=2)}")
 
     # submit hysds job
     return submit_hysds_job(job)

@@ -48,13 +48,13 @@ def check_paired_args(prefix, spec, io):
     for name in spec_names:
         check_true(name in io_names,
                    True,
-                   "{0} defines job-spec parameter without match in "
-                   "hysds-io: {1}".format(prefix, name))
+                   "{} defines job-spec parameter without match in "
+                   "hysds-io: {}".format(prefix, name))
     for name in io_names:
         check_true(name in spec_names,
                    True,
-                   "{0} defines hysds-io parameter without match in "
-                   "job-spec: {1}".format(prefix, name))
+                   "{} defines hysds-io parameter without match in "
+                   "job-spec: {}".format(prefix, name))
 
 
 def check_lambdas(prefix, io):
@@ -79,14 +79,14 @@ def check_lambdas(prefix, io):
                 fn = eval(param["lambda"], namespace, {})
                 check_true(isinstance(fn, types.LambdaType),
                            True,
-                           "{0} defines hysds-io lambda modifier for "
-                           "parameter, {1}, which does not equate to a lambda "
+                           "{} defines hysds-io lambda modifier for "
+                           "parameter, {}, which does not equate to a lambda "
                            "function".format(prefix, name))
                 argspec = inspect.getfullargspec(fn)
                 check_true(len(argspec[0]) == 1,
                            True,
-                           "{0} defines hysds-io lambda modifer for "
-                           "parameter, {1}, which does not except exactly "
+                           "{} defines hysds-io lambda modifer for "
+                           "parameter, {}, which does not except exactly "
                            "1 argument".format(prefix, name))
                 try:
                     fn("Some test value")
@@ -99,9 +99,9 @@ def check_lambdas(prefix, io):
             except Exception as e:
                 check_true(False,
                            True,
-                           "{0} defines hysds-io lambda modifier for "
-                           "parameter, {1}, which errors on compile. "
-                           "{2}:{3}".format(
+                           "{} defines hysds-io lambda modifier for "
+                           "parameter, {}, which errors on compile. "
+                           "{}:{}".format(
                                prefix, name, str(type(e)), e))
 
 
@@ -132,7 +132,7 @@ def pair(jsons):
     for k, v in list(objects.items()):
         for f_type in ["hysds-io", "job-spec"]:
             check_true(f_type in v, False,
-                       "{0} does not define a {1}.json".format(k, f_type))
+                       f"{k} does not define a {f_type}.json")
     return objects
 
 
@@ -145,7 +145,7 @@ def json_formatted(files):
     jsons = {}
     for fle in files:
         try:
-            with open(fle, "r") as fp:
+            with open(fle) as fp:
                 jsons[fle] = json.load(fp)
         except Exception as e:
             extra = "" if "No JSON object could be decoded" in str(e) \
@@ -160,7 +160,7 @@ def json_formatted(files):
 if __name__ == "__main__":
     """Main functions"""
     if len(sys.argv) != 2:
-        print("Usage:\n\t{} <directory>".format(sys.argv[0]), file=sys.stderr)
+        print(f"Usage:\n\t{sys.argv[0]} <directory>", file=sys.stderr)
         sys.exit(-1)
     directory = sys.argv[1]
     try:
@@ -170,23 +170,23 @@ if __name__ == "__main__":
     except Exception as err:
         files = []
     if len(files) == 0:
-        print("[ERROR] No files found in directory: {0}".format(
+        print("[ERROR] No files found in directory: {}".format(
             directory), file=sys.stderr)
         sys.exit(1)
     jsons = json_formatted(files)
     pairs = pair(jsons)
     # Parse the schemas
-    with open(HYSDS_IO_SCHEMA_FILE, 'r') as f:
+    with open(HYSDS_IO_SCHEMA_FILE) as f:
         io_schema = json.load(f)
-    with open(JOB_SPEC_SCHEMA_FILE, 'r') as f:
+    with open(JOB_SPEC_SCHEMA_FILE) as f:
         spec_schema = json.load(f)
 
     for k, v in list(pairs.items()):
         if "job-spec" in v:
-            print("Validating job-spec for {}".format(k))
+            print(f"Validating job-spec for {k}")
             validate(k, v['job-spec'], spec_schema)
         if "hysds-io" in v:
-            print("Validating hysds-io for {}".format(k))
+            print(f"Validating hysds-io for {k}")
             validate(k, v['hysds-io'], io_schema)
             check_lambdas(k, v['hysds-io'])
         if "job-spec" in v and "hysds-io" in v:
