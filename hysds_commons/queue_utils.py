@@ -7,7 +7,8 @@ standard_library.install_aliases()
 
 import os
 import requests
-
+from requests.adapters import HTTPAdapter
+from requests.packages.urllib3.util.ssl_ import create_urllib3_context
 from hysds_commons.log_utils import logger
 from hysds.celery import app
 
@@ -23,6 +24,11 @@ HYSDS_QUEUES = (
     app.conf['PROCESS_EVENTS_TASKS_QUEUE'],
 )
 
+class CustomCipherAdapter(HTTPAdapter):
+    def init_poolmanager(self, *args, **kwargs):
+        ssl_context = create_urllib3_context(ciphers="DHE-RSA-AES128-GCM-SHA256")
+        kwargs["ssl_context"] = ssl_context
+        return super(CustomCipherAdapter, self).init_poolmanager(*args, **kwargs)
 
 def get_all_queues(rabbitmq_admin_url):
     """
@@ -33,9 +39,12 @@ def get_all_queues(rabbitmq_admin_url):
     """
 
     try:
+        session = requests.Session()
+        session.mount("https://", CustomCipherAdapter())
+
         endpoint = os.path.join(rabbitmq_admin_url, "api/queues")
 
-        req = requests.get(endpoint)
+        req = session.get(endpoint, verify=False)
         req.raise_for_status()
 
         data = req.json()
