@@ -65,7 +65,7 @@ class SearchUtility(ABC):
         similar to get_by_id, but this uses the _search API and can be used on aliases w/ multiple indices
         https://elasticsearch-py.readthedocs.io/en/master/api.html#elasticsearch.Elasticsearch.search
         @param kwargs:
-            - _id: Str, ES document id
+            - id: Str, ES document id
             - index: Str, ES index or alias
             - return_all: Bool, if there are more than one records returned
                 List[Dict] if True, else returns Dict of the latest record
