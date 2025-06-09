@@ -26,7 +26,7 @@ HYSDS_QUEUES = (
 
 class CustomCipherAdapter(HTTPAdapter):
     def init_poolmanager(self, *args, **kwargs):
-        ssl_context = create_urllib3_context(ciphers="DHE-RSA-AES128-GCM-SHA256")
+        ssl_context = create_urllib3_context(ciphers=app.conf.get("broker_use_ssl", {}).get("ciphers"))
         kwargs["ssl_context"] = ssl_context
         return super(CustomCipherAdapter, self).init_poolmanager(*args, **kwargs)
 

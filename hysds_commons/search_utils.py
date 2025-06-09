@@ -8,10 +8,7 @@ standard_library.install_aliases()
 from abc import ABC
 from packaging import version
 from pathlib import Path
-import logging
 import os
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger("search_utils")
 import netrc
 import warnings
 import backoff
@@ -309,7 +306,7 @@ class SearchUtility(ABC):
         has_correct_permission = self.file_is_0600(netrc_file)
 
         if not has_correct_permission:
-            logger.error("Your %s file does not have the correct permissions: 0600 (r/w for user only. "
+            self.logger.error("Your %s file does not have the correct permissions: 0600 (r/w for user only. "
                          "Attempting to chmod", path)
             os.chmod(netrc_file, 0o600)
 
