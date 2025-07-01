@@ -2,7 +2,7 @@ version: 2.1
 jobs:
   test:
     docker:
-      - image: hysds/pge-base:latest
+      - image: hysds/pge-base:HC-563
         auth:
           username: $DOCKER_USER
           password: $DOCKER_PASS
@@ -26,7 +26,7 @@ jobs:
 
   build:
     docker:
-      - image: cimg/python:3.9
+      - image: cimg/python:3.12
         auth:
           username: $DOCKER_USER
           password: $DOCKER_PASS
@@ -45,7 +45,7 @@ jobs:
             pytest .
   publish-pypi:
     docker:
-      - image: cimg/python:3.9
+      - image: cimg/python:3.12
         auth:
           username: $DOCKER_USER
           password: $DOCKER_PASS
