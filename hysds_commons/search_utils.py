@@ -3,7 +3,11 @@ standard_library.install_aliases()
 
 from abc import ABC
 from packaging import version
+from pathlib import Path
+import os
+import netrc
 import warnings
+import backoff
 
 warnings.simplefilter('always', UserWarning)
 
@@ -285,3 +289,98 @@ class SearchUtility(ABC):
             ignore - will not raise error if status code is specified (ex. 404, [400, 404])
         """
         return self.es.update(**kwargs)
+
+    def file_is_0600(self, filename):
+        """Check that a file has 0600 permissions (read/write for user only)."""
+        return oct(Path(filename).stat().st_mode)[-4:] == "0600"
+
+    def get_creds(self, creds_entry, path="~/.netrc-os"):
+        """Extract a username/password tuple from the entry creds_entry in netrc file provided in path.
+        Updates credential file permissions to 600 if needed to keep them secure."""
+        netrc_file = Path(path).expanduser()
+        n = netrc.netrc(netrc_file)
+        has_correct_permission = self.file_is_0600(netrc_file)
+
+        if not has_correct_permission:
+            self.logger.error("Your %s file does not have the correct permissions: 0600 (r/w for user only. "
+                         "Attempting to chmod", path)
+            os.chmod(netrc_file, 0o600)
+
+        credentials = n.authenticators(creds_entry)
+        if credentials is not None:
+            return credentials[0], credentials[2]
+        else:
+            raise KeyError("Unable to extract OpenSearch credentials from %s for %s", path, creds_entry)
+
+class JitteredBackoffException(Exception):
+    pass
+
+
+class JitteredBackoffHandler:
+    def __init__(self, max_value, max_time, logger):
+        self.max_value = max_value
+        self.max_time = max_time
+        self.logger = logger
+
+    def log_backoff(self, details):
+        if self.logger is not None:
+            self.logger.error(
+                "Backing off {wait:0.1f} seconds after {tries} tries " "calling function {target} with args {args} and kwargs " "{kwargs}".format(**details)
+            )
+
+    def log_giveup(self, details):
+        if self.logger is not None:
+            self.logger.error(f"Giving up after {details['tries']} tries due to {details['value']}")
+
+    def backoff_wrapper(self, func, *args, **kwargs):
+        @backoff.on_exception(
+            backoff.expo,
+            Exception,
+            max_value=self.max_value,
+            max_time=self.max_time,
+            jitter=backoff.full_jitter,
+            on_backoff=self.log_backoff,
+            on_giveup=self.log_giveup,
+        )
+        def wrapper(*args, **kwargs):
+            try:
+                return func(*args, **kwargs)
+            except Exception as e:
+                if self.logger is not None:
+                    self.logger.error(f"Exception occurred: {str(e)}")
+                raise JitteredBackoffException(f"Exception occurred: {str(e)}") from e
+
+        return wrapper
+
+
+def jittered_backoff_class_factory(base_conn_class):
+    class JitteredBackoffConnection(base_conn_class):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.max_value = kwargs.get("max_value", 13)
+            self.max_time = kwargs.get("max_time", 34)
+            self.logger = kwargs.get("logger", None)
+            self.backoff_handler = JitteredBackoffHandler(self.max_value, self.max_time, self.logger)
+            self.backoff_wrapped_func = self.backoff_handler.backoff_wrapper(super().perform_request)
+
+        def perform_request(
+            self,
+            method,
+            url,
+            params=None,
+            body=None,
+            timeout=None,
+            ignore=(),
+            headers=None,
+        ):
+            return self.backoff_wrapped_func(
+                method,
+                url,
+                params=params,
+                body=body,
+                timeout=timeout,
+                ignore=ignore,
+                headers=headers,
+            )
+
+    return JitteredBackoffConnection
