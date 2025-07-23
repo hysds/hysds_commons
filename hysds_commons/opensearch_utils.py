@@ -1,14 +1,29 @@
 from future import standard_library
-standard_library.install_aliases()
-
 from opensearchpy import OpenSearch
+from opensearchpy import RequestsHttpConnection as RequestsHttpConnectionOS
+from hysds_commons.search_utils import jittered_backoff_class_factory
+from hysds_commons.log_utils import logger
 from hysds_commons.search_utils import SearchUtility
 
+standard_library.install_aliases()
 
 class OpenSearchUtility(SearchUtility):
     def __init__(self, host, **kwargs):
         super().__init__(host)
-        self.es = OpenSearch(hosts=host if type(host) == list else [host], **kwargs)
+
+        self.es = OpenSearch(hosts=host if type(host) == list else [host],
+                             use_ssl=True,
+                             verify_certs=False,
+                             ssl_assert_hostname=False,
+                             connection_class=jittered_backoff_class_factory(RequestsHttpConnectionOS),
+                             connection_class_params={
+                                 "max_value": 13,
+                                 "max_time": 34,
+                                 "logger": logger,
+                             },
+                             ssl_show_warn=False,
+                             http_auth=self.get_creds(creds_entry="default"),
+                             **kwargs)
         self.version = None
         self.engine = "opensearch"
 
