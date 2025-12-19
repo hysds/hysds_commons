@@ -255,6 +255,39 @@ class TestSearchByIdMethod:
         assert "expand_wildcards" not in call_kwargs
 
 
+class TestPitMethod:
+    """Tests for _pit() method with closed index handling."""
+
+    def setup_method(self):
+        """Set up test fixtures."""
+        self.utility = ConcreteSearchUtility()
+        self.utility.es.open_point_in_time.return_value = {"id": "pit_id_123"}
+        self.utility.es.search.return_value = {
+            "hits": {"total": {"value": 0}, "hits": []}
+        }
+        self.utility.es.close_point_in_time.return_value = {"succeeded": True}
+
+    def test_pit_with_wildcard_applies_params_to_open_point_in_time(self):
+        """_pit() should apply closed index params to open_point_in_time for wildcard patterns."""
+        self.utility._pit(index="job_status-*", body={"query": {"match_all": {}}})
+
+        # Verify open_point_in_time was called with closed index params
+        call_kwargs = self.utility.es.open_point_in_time.call_args[1]
+        assert call_kwargs["ignore_unavailable"] is True
+        assert call_kwargs["allow_no_indices"] is True
+        assert call_kwargs["expand_wildcards"] == "open"
+
+    def test_pit_without_wildcard_no_params_to_open_point_in_time(self):
+        """_pit() should not apply params to open_point_in_time for non-wildcard index."""
+        self.utility._pit(index="job_status-current", body={"query": {"match_all": {}}})
+
+        # Verify open_point_in_time was called without closed index params
+        call_kwargs = self.utility.es.open_point_in_time.call_args[1]
+        assert "ignore_unavailable" not in call_kwargs
+        assert "allow_no_indices" not in call_kwargs
+        assert "expand_wildcards" not in call_kwargs
+
+
 class TestClosedIndexParamsConstant:
     """Tests for CLOSED_INDEX_PARAMS class constant."""
 
