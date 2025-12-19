@@ -12,6 +12,7 @@ jobs:
           name: Test
           command: |
             source $HOME/verdi/bin/activate
+            rm -f $HOME/verdi/ops/hysds/celeryconfig.py
             cp $HOME/verdi/ops/hysds/configs/celery/celeryconfig.py.tmpl $HOME/verdi/ops/hysds/celeryconfig.py
             pip install -U pytest jsonschema
             pip install -e .
