@@ -33,13 +33,16 @@ class SearchUtility(ABC):
         Check if an index pattern contains wildcards or multiple indices.
 
         Args:
-            index: Index name or pattern (can be str or None)
+            index: Index name or pattern (can be str, list, or None)
 
         Returns:
             bool: True if index contains wildcards (*) or multiple indices (,)
         """
         if index is None:
             return False
+        # Handle list of indices - check each element for wildcards
+        if isinstance(index, list):
+            return any("*" in idx or "," in idx for idx in index if isinstance(idx, str))
         return "*" in index or "," in index
 
     def _apply_closed_index_params(self, kwargs):

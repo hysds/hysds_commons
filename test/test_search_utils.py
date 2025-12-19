@@ -54,6 +54,31 @@ class TestIsWildcardIndex:
         """Empty string should return False."""
         assert SearchUtility._is_wildcard_index("") is False
 
+    def test_list_with_wildcard(self):
+        """List containing wildcard patterns should be detected."""
+        assert SearchUtility._is_wildcard_index(["logs-*", "metrics-*"]) is True
+        assert SearchUtility._is_wildcard_index(["job_status-*"]) is True
+        assert SearchUtility._is_wildcard_index(["grq_*_product", "task_status"]) is True
+
+    def test_list_with_comma_pattern(self):
+        """List containing comma patterns should be detected."""
+        assert SearchUtility._is_wildcard_index(["index1,index2"]) is True
+
+    def test_list_without_wildcard(self):
+        """List without any wildcards should return False."""
+        assert SearchUtility._is_wildcard_index(["job_status-current"]) is False
+        assert SearchUtility._is_wildcard_index(["index1", "index2"]) is False
+        assert SearchUtility._is_wildcard_index(["grq_v1.0_product", "grq_v1.0_task"]) is False
+
+    def test_empty_list(self):
+        """Empty list should return False."""
+        assert SearchUtility._is_wildcard_index([]) is False
+
+    def test_list_with_non_string_elements(self):
+        """List with non-string elements should be handled gracefully."""
+        assert SearchUtility._is_wildcard_index([None, "job_status-*"]) is True
+        assert SearchUtility._is_wildcard_index([123, "job_status"]) is False
+
 
 class TestApplyClosedIndexParams:
     """Tests for _apply_closed_index_params() method."""
