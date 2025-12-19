@@ -13,11 +13,53 @@ warnings.simplefilter('always', UserWarning)
 
 
 class SearchUtility(ABC):
+    # Default parameters for handling closed indices in wildcard queries (HC-600)
+    # These parameters allow queries to gracefully skip closed indices instead of failing
+    CLOSED_INDEX_PARAMS = {
+        "ignore_unavailable": True,   # Skip closed/missing indices without error
+        "allow_no_indices": True,     # Return empty results if all matching indices are closed
+        "expand_wildcards": "open"    # Only query open indices, skip closed ones
+    }
+
     def __init__(self, host, **kwargs):
         self.es = None
         self.version = None
         self.engine = None
         self.flavor = None
+
+    @staticmethod
+    def _is_wildcard_index(index):
+        """
+        Check if an index pattern contains wildcards or multiple indices.
+
+        Args:
+            index: Index name or pattern (can be str or None)
+
+        Returns:
+            bool: True if index contains wildcards (*) or multiple indices (,)
+        """
+        if index is None:
+            return False
+        return "*" in index or "," in index
+
+    def _apply_closed_index_params(self, kwargs):
+        """
+        Apply closed index handling parameters for wildcard index patterns.
+
+        Only adds the parameters if the index pattern contains wildcards or
+        multiple indices, and only sets them if not already specified by the caller.
+
+        Args:
+            kwargs: Dictionary of keyword arguments (modified in place)
+
+        Returns:
+            kwargs: The modified keyword arguments dictionary
+        """
+        index = kwargs.get("index")
+        if self._is_wildcard_index(index):
+            for key, value in self.CLOSED_INDEX_PARAMS.items():
+                kwargs.setdefault(key, value)
+        return kwargs
 
     def set_version(self):
         """
@@ -85,6 +127,7 @@ class SearchUtility(ABC):
                 }
             }
         }
+        self._apply_closed_index_params(kwargs)
         docs = self.es.search(**kwargs)
 
         hits = docs.get("hits", {}).get("hits", [])
@@ -121,6 +164,11 @@ class SearchUtility(ABC):
         index = kwargs.pop("index", body.pop("index", None))
         if index is None:
             raise RuntimeError("ElasticsearchUtility._pit: the search_after API must specify a index/alias")
+
+        # Apply closed index params for wildcard patterns (HC-600)
+        if self._is_wildcard_index(index):
+            for key, value in self.CLOSED_INDEX_PARAMS.items():
+                kwargs.setdefault(key, value)
 
         size = kwargs.get("size", body.get("size"))
         if not size:
@@ -199,11 +247,15 @@ class SearchUtility(ABC):
             scroll – Specify how long a consistent view of the index should be maintained for scrolled search
             size – Number of hits to return (default: 10)
             sort – A comma-separated list of <field>:<direction> pairs
+            ignore_unavailable – (auto-set for wildcards) Skip unavailable indices
+            allow_no_indices – (auto-set for wildcards) Allow empty results if no indices match
+            expand_wildcards – (auto-set for wildcards) Control wildcard expansion (default: "open")
 
         https://elasticsearch-py.readthedocs.io/en/master/api.html#elasticsearch.Elasticsearch.clear_scroll
             body – A comma-separated list of scroll IDs to clear if none was specified via the scroll_id parameter
             scroll_id – A comma-separated list of scroll IDs to clear
         """
+        self._apply_closed_index_params(kwargs)
         page_limit = 10000
         if "size" not in kwargs and "size" not in kwargs.get("body", {}):
             kwargs["size"] = 1000
@@ -247,7 +299,11 @@ class SearchUtility(ABC):
             scroll – Specify how long a consistent view of the index should be maintained for scrolled search
             size – Number of hits to return (default: 10)
             sort – A comma-separated list of <field>:<direction> pairs
+            ignore_unavailable – (auto-set for wildcards) Skip unavailable indices
+            allow_no_indices – (auto-set for wildcards) Allow empty results if no indices match
+            expand_wildcards – (auto-set for wildcards) Control wildcard expansion (default: "open")
         """
+        self._apply_closed_index_params(kwargs)
         return self.es.search(**kwargs)
 
     def get_count(self, **kwargs):
@@ -258,7 +314,11 @@ class SearchUtility(ABC):
             index – (required) A comma-separated list of indices to restrict the results
             q – Query in the Lucene query string syntax
             ignore - will not raise error if status code is specified (ex. 404, [400, 404])
+            ignore_unavailable – (auto-set for wildcards) Skip unavailable indices
+            allow_no_indices – (auto-set for wildcards) Allow empty results if no indices match
+            expand_wildcards – (auto-set for wildcards) Control wildcard expansion (default: "open")
         """
+        self._apply_closed_index_params(kwargs)
         result = self.es.count(**kwargs)
         return result["count"]
 
