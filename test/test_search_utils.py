@@ -105,14 +105,15 @@ class TestApplyClosedIndexParams:
         assert kwargs["allow_no_indices"] is True
         assert kwargs["expand_wildcards"] == "open"
 
-    def test_does_not_apply_for_single_index(self):
-        """Should not apply params for single index without wildcards."""
+    def test_applies_params_for_single_index(self):
+        """Should apply params for single index (could be an alias to closed indices)."""
         kwargs = {"index": "job_status-current", "body": {}}
         self.utility._apply_closed_index_params(kwargs)
 
-        assert "ignore_unavailable" not in kwargs
-        assert "allow_no_indices" not in kwargs
-        assert "expand_wildcards" not in kwargs
+        # Params are always applied since aliases can resolve to closed indices
+        assert kwargs["ignore_unavailable"] is True
+        assert kwargs["allow_no_indices"] is True
+        assert kwargs["expand_wildcards"] == "open"
 
     def test_does_not_override_existing_params(self):
         """Should not override caller-specified params."""
@@ -145,14 +146,15 @@ class TestApplyClosedIndexParams:
         assert kwargs["allow_no_indices"] is True
         assert kwargs["expand_wildcards"] == "open"
 
-    def test_handles_none_index(self):
-        """Should handle None index gracefully."""
+    def test_applies_params_for_none_index(self):
+        """Should apply params even when index is None (for safety)."""
         kwargs = {"body": {}}
         self.utility._apply_closed_index_params(kwargs)
 
-        assert "ignore_unavailable" not in kwargs
-        assert "allow_no_indices" not in kwargs
-        assert "expand_wildcards" not in kwargs
+        # Params are always applied for safety
+        assert kwargs["ignore_unavailable"] is True
+        assert kwargs["allow_no_indices"] is True
+        assert kwargs["expand_wildcards"] == "open"
 
     def test_returns_kwargs(self):
         """Should return the modified kwargs dict."""
@@ -181,14 +183,14 @@ class TestSearchMethod:
         assert call_kwargs["allow_no_indices"] is True
         assert call_kwargs["expand_wildcards"] == "open"
 
-    def test_search_without_wildcard_no_params(self):
-        """search() should not apply params for non-wildcard index."""
+    def test_search_with_single_index_applies_params(self):
+        """search() should apply params for single index (could be alias to closed indices)."""
         self.utility.search(index="job_status-current", body={"query": {"match_all": {}}})
 
         call_kwargs = self.utility.es.search.call_args[1]
-        assert "ignore_unavailable" not in call_kwargs
-        assert "allow_no_indices" not in call_kwargs
-        assert "expand_wildcards" not in call_kwargs
+        assert call_kwargs["ignore_unavailable"] is True
+        assert call_kwargs["allow_no_indices"] is True
+        assert call_kwargs["expand_wildcards"] == "open"
 
 
 class TestQueryMethod:
@@ -212,15 +214,15 @@ class TestQueryMethod:
         assert call_kwargs["allow_no_indices"] is True
         assert call_kwargs["expand_wildcards"] == "open"
 
-    def test_query_without_wildcard_no_params(self):
-        """query() should not apply params for non-wildcard index."""
+    def test_query_with_single_index_applies_params(self):
+        """query() should apply params for single index (could be alias to closed indices)."""
         self.utility.query(index="job_status-current", body={"query": {"match_all": {}}})
 
         # Get the first call's kwargs (the initial search call)
         call_kwargs = self.utility.es.search.call_args_list[0][1]
-        assert "ignore_unavailable" not in call_kwargs
-        assert "allow_no_indices" not in call_kwargs
-        assert "expand_wildcards" not in call_kwargs
+        assert call_kwargs["ignore_unavailable"] is True
+        assert call_kwargs["allow_no_indices"] is True
+        assert call_kwargs["expand_wildcards"] == "open"
 
 
 class TestGetCountMethod:
@@ -241,14 +243,14 @@ class TestGetCountMethod:
         assert call_kwargs["expand_wildcards"] == "open"
         assert result == 42
 
-    def test_get_count_without_wildcard_no_params(self):
-        """get_count() should not apply params for non-wildcard index."""
+    def test_get_count_with_single_index_applies_params(self):
+        """get_count() should apply params for single index (could be alias to closed indices)."""
         self.utility.get_count(index="job_status-current", body={"query": {"match_all": {}}})
 
         call_kwargs = self.utility.es.count.call_args[1]
-        assert "ignore_unavailable" not in call_kwargs
-        assert "allow_no_indices" not in call_kwargs
-        assert "expand_wildcards" not in call_kwargs
+        assert call_kwargs["ignore_unavailable"] is True
+        assert call_kwargs["allow_no_indices"] is True
+        assert call_kwargs["expand_wildcards"] == "open"
 
 
 class TestSearchByIdMethod:
@@ -270,14 +272,14 @@ class TestSearchByIdMethod:
         assert call_kwargs["allow_no_indices"] is True
         assert call_kwargs["expand_wildcards"] == "open"
 
-    def test_search_by_id_without_wildcard_no_params(self):
-        """search_by_id() should not apply params for non-wildcard index."""
+    def test_search_by_id_with_single_index_applies_params(self):
+        """search_by_id() should apply params for single index (could be alias to closed indices)."""
         self.utility.search_by_id(index="job_status-current", id="doc1")
 
         call_kwargs = self.utility.es.search.call_args[1]
-        assert "ignore_unavailable" not in call_kwargs
-        assert "allow_no_indices" not in call_kwargs
-        assert "expand_wildcards" not in call_kwargs
+        assert call_kwargs["ignore_unavailable"] is True
+        assert call_kwargs["allow_no_indices"] is True
+        assert call_kwargs["expand_wildcards"] == "open"
 
 
 class TestPitMethod:
@@ -302,15 +304,15 @@ class TestPitMethod:
         assert call_kwargs["allow_no_indices"] is True
         assert call_kwargs["expand_wildcards"] == "open"
 
-    def test_pit_without_wildcard_no_params_to_open_point_in_time(self):
-        """_pit() should not apply params to open_point_in_time for non-wildcard index."""
+    def test_pit_with_single_index_applies_params_to_open_point_in_time(self):
+        """_pit() should apply params to open_point_in_time for single index (could be alias)."""
         self.utility._pit(index="job_status-current", body={"query": {"match_all": {}}})
 
-        # Verify open_point_in_time was called without closed index params
+        # Verify open_point_in_time was called with closed index params
         call_kwargs = self.utility.es.open_point_in_time.call_args[1]
-        assert "ignore_unavailable" not in call_kwargs
-        assert "allow_no_indices" not in call_kwargs
-        assert "expand_wildcards" not in call_kwargs
+        assert call_kwargs["ignore_unavailable"] is True
+        assert call_kwargs["allow_no_indices"] is True
+        assert call_kwargs["expand_wildcards"] == "open"
 
 
 class TestClosedIndexParamsConstant:
