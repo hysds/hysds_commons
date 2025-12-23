@@ -47,10 +47,14 @@ class SearchUtility(ABC):
 
     def _apply_closed_index_params(self, kwargs):
         """
-        Apply closed index handling parameters for wildcard index patterns.
+        Apply closed index handling parameters to all search queries.
 
-        Only adds the parameters if the index pattern contains wildcards or
-        multiple indices, and only sets them if not already specified by the caller.
+        These parameters are always applied because:
+        1. Aliases (like 'grq') can resolve to multiple indices, some of which may be closed
+        2. The params are harmless for single open indices
+        3. They only affect closed indices and don't change behavior for open ones
+
+        Only sets params if not already specified by the caller.
 
         Args:
             kwargs: Dictionary of keyword arguments (modified in place)
@@ -58,10 +62,8 @@ class SearchUtility(ABC):
         Returns:
             kwargs: The modified keyword arguments dictionary
         """
-        index = kwargs.get("index")
-        if self._is_wildcard_index(index):
-            for key, value in self.CLOSED_INDEX_PARAMS.items():
-                kwargs.setdefault(key, value)
+        for key, value in self.CLOSED_INDEX_PARAMS.items():
+            kwargs.setdefault(key, value)
         return kwargs
 
     def set_version(self):
@@ -168,12 +170,12 @@ class SearchUtility(ABC):
         if index is None:
             raise RuntimeError("ElasticsearchUtility._pit: the search_after API must specify a index/alias")
 
-        # Apply closed index params for wildcard patterns (HC-600)
+        # Apply closed index params (HC-600) - always apply since aliases can
+        # resolve to multiple indices, some of which may be closed
         pit_params = {}
-        if self._is_wildcard_index(index):
-            for key, value in self.CLOSED_INDEX_PARAMS.items():
-                kwargs.setdefault(key, value)
-                pit_params[key] = kwargs[key]
+        for key, value in self.CLOSED_INDEX_PARAMS.items():
+            kwargs.setdefault(key, value)
+            pit_params[key] = kwargs[key]
 
         size = kwargs.get("size", body.get("size"))
         if not size:
