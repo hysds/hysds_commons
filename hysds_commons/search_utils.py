@@ -170,12 +170,9 @@ class SearchUtility(ABC):
         if index is None:
             raise RuntimeError("ElasticsearchUtility._pit: the search_after API must specify a index/alias")
 
-        # Apply closed index params (HC-600) - always apply since aliases can
-        # resolve to multiple indices, some of which may be closed
-        pit_params = {}
-        for key, value in self.CLOSED_INDEX_PARAMS.items():
-            kwargs.setdefault(key, value)
-            pit_params[key] = kwargs[key]
+        # Apply closed index params to PIT open call (HC-600).
+        # PIT APIs only accept ignore_unavailable and expand_wildcards (not allow_no_indices).
+        pit_params = {k: v for k, v in self.CLOSED_INDEX_PARAMS.items() if k != "allow_no_indices"}
 
         size = kwargs.get("size", body.get("size"))
         if not size:
@@ -188,6 +185,12 @@ class SearchUtility(ABC):
         pit = None
         if self.flavor != "oss":
             pit = self.es.open_point_in_time(index=index, keep_alive=keep_alive, **pit_params)
+
+            # Once the PIT is open, strip indicesOptions from kwargs — OpenSearch/ES
+            # rejects them on _search calls when a PIT is in the body.
+            for key in self.CLOSED_INDEX_PARAMS:
+                kwargs.pop(key, None)
+
             body = {
                 **body,
                 **{"pit": {**pit, **{"keep_alive": keep_alive}}},
