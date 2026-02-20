@@ -46,11 +46,16 @@ class OpenSearchUtility(SearchUtility):
 
         # Apply closed index params to PIT open call (HC-600).
         # PIT APIs only accept ignore_unavailable and expand_wildcards (not allow_no_indices).
-        pit_params = {k: v for k, v in self.CLOSED_INDEX_PARAMS.items() if k != "allow_no_indices"}
+        # Extract caller-specified params from kwargs first, then apply defaults.
+        pit_params = {}
+        for key, default_value in self.CLOSED_INDEX_PARAMS.items():
+            if key != "allow_no_indices":  # PIT APIs don't accept this param
+                pit_params[key] = kwargs.pop(key, default_value)
+        
         pit = self.es.create_point_in_time(index=index, keep_alive=keep_alive, **pit_params)
         pit_id = pit["pit_id"]
 
-        # Once the PIT is open, strip indicesOptions from kwargs — OpenSearch/ES
+        # Once the PIT is open, strip any remaining indicesOptions from kwargs — OpenSearch/ES
         # rejects them on _search calls when a PIT is in the body.
         for key in self.CLOSED_INDEX_PARAMS:
             kwargs.pop(key, None)
