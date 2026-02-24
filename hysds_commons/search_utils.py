@@ -201,6 +201,9 @@ class SearchUtility(ABC):
             }
         else:
             warnings.warn("Elasticsearch OSS does not support _pit, will use search_after without _pit...")
+            # Restore closed-index params for OSS search (no PIT to conflict with)
+            for key, default_value in self.CLOSED_INDEX_PARAMS.items():
+                kwargs.setdefault(key, default_value)
         res = self.es.search(body=body, **kwargs)
 
         records = []
