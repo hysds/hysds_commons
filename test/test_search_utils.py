@@ -10,6 +10,7 @@ import pytest
 from unittest.mock import MagicMock, patch
 
 from hysds_commons.search_utils import SearchUtility
+from hysds_commons.opensearch_utils import OpenSearchUtility
 
 
 class ConcreteSearchUtility(SearchUtility):
@@ -21,6 +22,15 @@ class ConcreteSearchUtility(SearchUtility):
         self.engine = "elasticsearch"
         self.version = None
         self.flavor = "default"
+
+
+class MockOpenSearchUtility(OpenSearchUtility):
+    """Mock OpenSearchUtility that skips real OpenSearch client initialization."""
+    def __init__(self):
+        self.es = MagicMock()
+        self.engine = "opensearch"
+        self.version = None
+        self.flavor = None
 
 
 class TestIsWildcardIndex:
@@ -294,25 +304,123 @@ class TestPitMethod:
         }
         self.utility.es.close_point_in_time.return_value = {"succeeded": True}
 
+    def test_pit_does_not_pass_allow_no_indices_to_open_pit(self):
+        """open_point_in_time() should NOT receive allow_no_indices."""
+        self.utility._pit(index="job_status-*", body={"query": {"match_all": {}}})
+        call_kwargs = self.utility.es.open_point_in_time.call_args[1]
+        assert "allow_no_indices" not in call_kwargs
+        assert call_kwargs["ignore_unavailable"] is True
+        assert call_kwargs["expand_wildcards"] == "open"
+
+    def test_pit_search_does_not_pass_indices_options(self):
+        """_search calls with PIT body must NOT include indicesOptions."""
+        self.utility._pit(index="job_status-*", body={"query": {"match_all": {}}})
+        call_kwargs = self.utility.es.search.call_args[1]
+        assert "ignore_unavailable" not in call_kwargs
+        assert "allow_no_indices" not in call_kwargs
+        assert "expand_wildcards" not in call_kwargs
+
     def test_pit_with_wildcard_applies_params_to_open_point_in_time(self):
         """_pit() should apply closed index params to open_point_in_time for wildcard patterns."""
         self.utility._pit(index="job_status-*", body={"query": {"match_all": {}}})
 
-        # Verify open_point_in_time was called with closed index params
+        # Verify open_point_in_time was called with closed index params (except allow_no_indices)
         call_kwargs = self.utility.es.open_point_in_time.call_args[1]
         assert call_kwargs["ignore_unavailable"] is True
-        assert call_kwargs["allow_no_indices"] is True
         assert call_kwargs["expand_wildcards"] == "open"
 
     def test_pit_with_single_index_applies_params_to_open_point_in_time(self):
         """_pit() should apply params to open_point_in_time for single index (could be alias)."""
         self.utility._pit(index="job_status-current", body={"query": {"match_all": {}}})
 
-        # Verify open_point_in_time was called with closed index params
+        # Verify open_point_in_time was called with closed index params (except allow_no_indices)
         call_kwargs = self.utility.es.open_point_in_time.call_args[1]
         assert call_kwargs["ignore_unavailable"] is True
-        assert call_kwargs["allow_no_indices"] is True
         assert call_kwargs["expand_wildcards"] == "open"
+
+
+class TestOpenSearchPitMethod:
+    """Tests for OpenSearchUtility._pit() with closed index handling (HC-600)."""
+
+    def setup_method(self):
+        """Set up test fixtures."""
+        self.utility = MockOpenSearchUtility()
+        self.utility.es.create_point_in_time.return_value = {
+            "pit_id": "opensearch_pit_id_123"
+        }
+        self.utility.es.search.return_value = {
+            "hits": {"total": {"value": 0}, "hits": []}
+        }
+        self.utility.es.delete_point_in_time.return_value = {"succeeded": True}
+
+    def test_create_pit_applies_closed_index_params(self):
+        """create_point_in_time() should receive ignore_unavailable and expand_wildcards."""
+        self.utility._pit(index="grq_v1.0_product-*", body={"query": {"match_all": {}}})
+        call_kwargs = self.utility.es.create_point_in_time.call_args[1]
+        assert call_kwargs["ignore_unavailable"] is True
+        assert call_kwargs["expand_wildcards"] == "open"
+
+    def test_create_pit_does_not_pass_allow_no_indices(self):
+        """PIT open APIs don't accept allow_no_indices -- must not be passed."""
+        self.utility._pit(index="grq", body={"query": {"match_all": {}}})
+        call_kwargs = self.utility.es.create_point_in_time.call_args[1]
+        assert "allow_no_indices" not in call_kwargs
+
+    def test_create_pit_applies_params_for_alias(self):
+        """create_point_in_time() should apply params for aliases (no wildcard in name)."""
+        self.utility._pit(index="grq", body={"query": {"match_all": {}}})
+        call_kwargs = self.utility.es.create_point_in_time.call_args[1]
+        assert call_kwargs["ignore_unavailable"] is True
+        assert call_kwargs["expand_wildcards"] == "open"
+
+    def test_create_pit_does_not_override_caller_params(self):
+        """Caller-specified closed-index params should not be overridden."""
+        self.utility._pit(
+            index="grq",
+            body={"query": {"match_all": {}}},
+            ignore_unavailable=False,
+            expand_wildcards="all",
+        )
+        call_kwargs = self.utility.es.create_point_in_time.call_args[1]
+        assert call_kwargs["ignore_unavailable"] is False
+        assert call_kwargs["expand_wildcards"] == "all"
+
+    def test_pit_search_does_not_pass_indices_options(self):
+        """_search calls with PIT must NOT include indicesOptions."""
+        self.utility._pit(index="grq", body={"query": {"match_all": {}}})
+        call_kwargs = self.utility.es.search.call_args[1]
+        assert "ignore_unavailable" not in call_kwargs
+        assert "allow_no_indices" not in call_kwargs
+        assert "expand_wildcards" not in call_kwargs
+
+    def test_pit_pagination_still_works(self):
+        """Verify pagination loop + PIT cleanup still functions correctly."""
+        page1 = {
+            "hits": {
+                "total": {"value": 2},
+                "hits": [
+                    {"_id": "1", "_source": {"id": "a"}, "sort": [1, "a"]},
+                    {"_id": "2", "_source": {"id": "b"}, "sort": [2, "b"]},
+                ],
+            }
+        }
+        page2 = {"hits": {"total": {"value": 2}, "hits": []}}
+        self.utility.es.search.side_effect = [page1, page2]
+
+        records = self.utility._pit(index="grq", body={"query": {"match_all": {}}})
+
+        assert len(records) == 2
+        assert records[0]["_id"] == "1"
+        assert records[1]["_id"] == "2"
+        # Verify PIT was cleaned up
+        self.utility.es.delete_point_in_time.assert_called_once_with(
+            body={"pit_id": ["opensearch_pit_id_123"]}
+        )
+
+    def test_missing_index_raises_runtime_error(self):
+        """_pit() should raise RuntimeError when no index is provided."""
+        with pytest.raises(RuntimeError, match="must specify a index/alias"):
+            self.utility._pit(body={"query": {"match_all": {}}})
 
 
 class TestClosedIndexParamsConstant:
