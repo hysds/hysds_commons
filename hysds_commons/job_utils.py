@@ -445,6 +445,7 @@ def resolve_hysds_job(job_type=None, queue=None, priority=None, tags=None, param
         "job_type": f"job:{job_type}",
         "job_queue": queue,
         "container_image_url": container_spec.get("url", None),
+        "container_image_urls": container_spec.get("urls", None),
         "container_image_name": container_spec.get("id", None),
         "container_mappings": overlays,
         "runtime_options": runtime_options,
