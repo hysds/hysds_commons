@@ -1,3 +1,5 @@
-__version__ = "2.2.0"
+from importlib.metadata import version
+
+__version__ = version("hysds-commons")
 __description__ = "Common HySDS Functions, Utilities, Etc."
-__url__ = "https://github.jpl.nasa.gov/hysds-org/hysds_commons"
+__url__ = "https://github.com/hysds/hysds_commons"

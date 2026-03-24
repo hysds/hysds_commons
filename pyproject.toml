@@ -1,0 +1,57 @@
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[project]
+name = "hysds-commons"
+dynamic = ["version"]
+description = "Common HySDS Functions, Utilities, Etc."
+readme = "README.md"
+license = {text = "Apache-2.0"}
+requires-python = ">=3.12"
+authors = [
+    {name = "HySDS", email = "hysds-help@jpl.nasa.gov"}
+]
+keywords = ["hysds", "commons", "utilities", "elasticsearch", "opensearch"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: Unix",
+    "Operating System :: MacOS :: MacOS X",
+]
+
+dependencies = [
+    # Core dependencies - matching original setup.py order and pins exactly
+    "elasticsearch>=7.0.0,<7.14.0",
+    "numpy<2.0.0",
+    "opensearch-py>=2.3.0,<3.0.0",
+    "requests>=2.7.0",
+    "jsonschema>=3.0.1",
+    "shapely>=1.8.2",
+    # Note: 'future>=0.17.1' removed - not needed on Python 3.12+
+]
+
+[project.urls]
+Homepage = "https://github.com/hysds/hysds_commons"
+Repository = "https://github.com/hysds/hysds_commons"
+Issues = "https://github.com/hysds/hysds_commons/issues"
+
+[tool.hatch.version]
+source = "vcs"
+raw-options = {version_scheme = "no-guess-dev"}
+
+[tool.hatch.build.targets.wheel]
+packages = ["hysds_commons"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/hysds_commons",
+    "README.md",
+    "LICENSE",
+]
