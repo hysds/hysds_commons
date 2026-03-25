@@ -13,8 +13,12 @@ from hysds_commons.job_utils import submit_mozart_job
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger("job-iterator")
 
-HYSDS_IOS_GRQ = app.conf.get('HYSDS_IOS_GRQ', 'hysds_ios-grq')
-HYSDS_IOS_MOZART = app.conf.get('HYSDS_IOS_MOZART', 'hysds_ios-mozart')
+# Lazy getters to avoid import-time Celery config access
+def get_hysds_ios_grq():
+    return app.conf.get('HYSDS_IOS_GRQ', 'hysds_ios-grq')
+
+def get_hysds_ios_mozart():
+    return app.conf.get('HYSDS_IOS_MOZART', 'hysds_ios-mozart')
 
 mozart_es = get_mozart_es()
 grq_es = get_grq_es()
@@ -59,7 +63,7 @@ def iterate(component, rule):
     logger.info("Elasticsearch queryobj: %s" % json.dumps(queryobj))
 
     # Get hysds_ios wiring
-    hysds_io_index = HYSDS_IOS_MOZART if component in ('mozart', 'figaro') else HYSDS_IOS_GRQ
+    hysds_io_index = get_hysds_ios_mozart() if component in ('mozart', 'figaro') else get_hysds_ios_grq()
     hysdsio = mozart_es.get_by_id(index=hysds_io_index, id=rule["job_type"])
     hysdsio = hysdsio['_source']
 
