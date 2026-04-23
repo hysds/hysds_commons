@@ -22,7 +22,7 @@ setup(
         'elasticsearch>=7.0.0,<7.14.0',
         # Pin numpy due to ES incompatability: https://github.com/elastic/elasticsearch-py/issues/2646
         'numpy<2.0.0',
-        'opensearch-py>=2.3.0,<3.0.0',
+        'opensearch-py>=2.3.0',
         'requests>=2.7.0',
         'future>=0.17.1',
         "jsonschema>=3.0.1",
