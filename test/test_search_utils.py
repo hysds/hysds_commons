@@ -437,3 +437,76 @@ class TestClosedIndexParamsConstant:
         assert SearchUtility.CLOSED_INDEX_PARAMS["ignore_unavailable"] is True
         assert SearchUtility.CLOSED_INDEX_PARAMS["allow_no_indices"] is True
         assert SearchUtility.CLOSED_INDEX_PARAMS["expand_wildcards"] == "open"
+
+
+class TestMsearch:
+    """Tests for msearch() method."""
+
+    def setup_method(self):
+        """Set up test fixtures."""
+        self.utility = ConcreteSearchUtility()
+        self.utility.es.msearch.return_value = {
+            "responses": [
+                {"hits": {"total": {"value": 1}, "hits": [{"_id": "doc1"}]}},
+                {"hits": {"total": {"value": 0}, "hits": []}},
+            ]
+        }
+
+    def test_applies_closed_index_params_to_each_header(self):
+        """Should apply closed index params to every search header."""
+        searches = [
+            ({"index": "grq"}, {"query": {"match_all": {}}}),
+            ({"index": "job_status-*"}, {"query": {"term": {"_id": "foo"}}}),
+        ]
+        self.utility.msearch(searches)
+
+        body = self.utility.es.msearch.call_args.kwargs["body"]
+        assert len(body) == 4
+        for header in (body[0], body[2]):
+            assert header["ignore_unavailable"] is True
+            assert header["allow_no_indices"] is True
+            assert header["expand_wildcards"] == "open"
+        assert body[0]["index"] == "grq"
+        assert body[2]["index"] == "job_status-*"
+
+    def test_does_not_override_caller_params(self):
+        """Caller-specified header params should not be overridden."""
+        searches = [
+            ({"index": "grq", "expand_wildcards": "all"}, {"query": {"match_all": {}}})
+        ]
+        self.utility.msearch(searches)
+
+        body = self.utility.es.msearch.call_args.kwargs["body"]
+        assert body[0]["expand_wildcards"] == "all"
+
+    def test_does_not_mutate_caller_headers(self):
+        """Caller's header dicts should not be modified in place."""
+        header = {"index": "grq"}
+        self.utility.msearch([(header, {"query": {"match_all": {}}})])
+
+        assert header == {"index": "grq"}
+
+    def test_returns_responses_in_request_order(self):
+        """Responses should be returned in the same order as the searches."""
+        searches = [
+            ({"index": "grq"}, {"query": {"term": {"_id": "a"}}}),
+            ({"index": "grq"}, {"query": {"term": {"_id": "b"}}}),
+        ]
+        responses = self.utility.msearch(searches)
+
+        assert len(responses) == 2
+        assert responses[0]["hits"]["total"]["value"] == 1
+        assert responses[1]["hits"]["total"]["value"] == 0
+
+    def test_empty_searches_returns_empty_list(self):
+        """Empty searches list should short-circuit without calling ES."""
+        assert self.utility.msearch([]) == []
+        self.utility.es.msearch.assert_not_called()
+
+    def test_kwargs_passed_through(self):
+        """Additional kwargs should be passed to the underlying msearch call."""
+        self.utility.msearch(
+            [({"index": "grq"}, {"query": {"match_all": {}}})], request_timeout=30
+        )
+
+        assert self.utility.es.msearch.call_args.kwargs["request_timeout"] == 30
