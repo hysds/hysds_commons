@@ -323,6 +323,31 @@ class SearchUtility(ABC):
         self._apply_closed_index_params(kwargs)
         return self.es.search(**kwargs)
 
+    def msearch(self, searches, **kwargs):
+        """
+        runs multiple searches in a single request through the multi search API and
+        returns the per-search responses in the same order as the given searches
+        https://elasticsearch-py.readthedocs.io/en/master/api.html#elasticsearch.Elasticsearch.msearch
+        https://opensearch.org/docs/latest/api-reference/multi-search/
+            searches – list of (header, body) pairs, ex. ({"index": "grq"}, {"query": ...});
+                each header specifies the index/alias its search runs against and the body
+                is the search definition using the Query DSL; closed index handling params
+                are applied to each header the same way search() applies them to a single query
+            kwargs – additional params passed to the underlying msearch call
+                (ex. request_timeout, max_concurrent_searches)
+        """
+        if not searches:
+            return []
+        body = []
+        for header, search_body in searches:
+            header = dict(header)
+            for key, value in self.CLOSED_INDEX_PARAMS.items():
+                header.setdefault(key, value)
+            body.append(header)
+            body.append(search_body)
+        result = self.es.msearch(body=body, **kwargs)
+        return result["responses"]
+
     def get_count(self, **kwargs):
         """
         returning the count for a given query (warning: ES7 returns max of 10000)
