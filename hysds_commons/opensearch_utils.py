@@ -32,8 +32,8 @@ class OpenSearchUtility(SearchUtility):
         using the PIT (point-in-time) + search_after API to do deep pagination
           - https://opensearch.org/docs/latest/search-plugins/point-in-time/
           - https://opensearch.org/docs/latest/search-plugins/point-in-time/#pagination-with-pit-and-search_after
-          - https://opensearch-project.github.io/opensearch-py/api-ref/clients/opensearch_client.html#opensearchpy.OpenSearch.create_point_in_time
-          - https://opensearch-project.github.io/opensearch-py/api-ref/clients/opensearch_client.html#opensearchpy.OpenSearch.delete_point_in_time
+          - https://opensearch-project.github.io/opensearch-py/api-ref/clients/opensearch_client.html#opensearchpy.OpenSearch.create_pit
+          - https://opensearch-project.github.io/opensearch-py/api-ref/clients/opensearch_client.html#opensearchpy.OpenSearch.delete_pit
         :param kwargs: please see the docstrings for the "search" method below
             * index is required when using the search_after API
         :return: List[any]
@@ -52,7 +52,17 @@ class OpenSearchUtility(SearchUtility):
             if key != "allow_no_indices":  # PIT APIs don't accept this param
                 pit_params[key] = kwargs.pop(key, default_value)
         
-        pit = self.es.create_point_in_time(index=index, keep_alive=keep_alive, **pit_params)
+        # opensearch-py 3.x removed create_point_in_time/delete_point_in_time in
+        # favour of create_pit/delete_pit (present since 2.4.1). create_pit takes
+        # no direct query-param kwargs -- keep_alive and the closed-index params
+        # must ride in `params`, with booleans stringified for the query string.
+        pit = self.es.create_pit(
+            index=index,
+            params={
+                "keep_alive": keep_alive,
+                **{k: (str(v).lower() if isinstance(v, bool) else v) for k, v in pit_params.items()},
+            },
+        )
         pit_id = pit["pit_id"]
 
         # Once the PIT is open, strip any remaining indicesOptions from kwargs — OpenSearch/ES
@@ -83,5 +93,5 @@ class OpenSearchUtility(SearchUtility):
             body["search_after"] = last_record["sort"]
             res = self.es.search(body=body, **kwargs)
 
-        self.es.delete_point_in_time(body={"pit_id": [pit_id]})
+        self.es.delete_pit(body={"pit_id": [pit_id]})
         return records

@@ -22,7 +22,10 @@ setup(
         'elasticsearch>=7.0.0,<7.14.0',
         # Pin numpy due to ES incompatability: https://github.com/elastic/elasticsearch-py/issues/2646
         'numpy<2.0.0',
-        'opensearch-py>=2.3.0',
+        # create_pit/delete_pit (used by OpenSearchUtility._pit) first appear in a
+        # release that also installs on Python 3.12 at 2.4.1; 2.3.x only has the
+        # spellings that opensearch-py 3.0 removed.
+        'opensearch-py>=2.4.1',
         'requests>=2.7.0',
         'future>=0.17.1',
         "jsonschema>=3.0.1",

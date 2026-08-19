@@ -345,33 +345,39 @@ class TestOpenSearchPitMethod:
     def setup_method(self):
         """Set up test fixtures."""
         self.utility = MockOpenSearchUtility()
-        self.utility.es.create_point_in_time.return_value = {
+        self.utility.es.create_pit.return_value = {
             "pit_id": "opensearch_pit_id_123"
         }
         self.utility.es.search.return_value = {
             "hits": {"total": {"value": 0}, "hits": []}
         }
-        self.utility.es.delete_point_in_time.return_value = {"succeeded": True}
+        self.utility.es.delete_pit.return_value = {"succeeded": True}
 
     def test_create_pit_applies_closed_index_params(self):
-        """create_point_in_time() should receive ignore_unavailable and expand_wildcards."""
+        """create_pit() should receive ignore_unavailable and expand_wildcards via params.
+
+        opensearch-py's create_pit takes no direct query-param kwargs, so these ride
+        in `params` and booleans are stringified for the query string.
+        """
         self.utility._pit(index="grq_v1.0_product-*", body={"query": {"match_all": {}}})
-        call_kwargs = self.utility.es.create_point_in_time.call_args[1]
-        assert call_kwargs["ignore_unavailable"] is True
-        assert call_kwargs["expand_wildcards"] == "open"
+        call_params = self.utility.es.create_pit.call_args.kwargs["params"]
+        assert call_params["ignore_unavailable"] == "true"
+        assert call_params["expand_wildcards"] == "open"
+        assert call_params["keep_alive"] == "2m"
 
     def test_create_pit_does_not_pass_allow_no_indices(self):
         """PIT open APIs don't accept allow_no_indices -- must not be passed."""
         self.utility._pit(index="grq", body={"query": {"match_all": {}}})
-        call_kwargs = self.utility.es.create_point_in_time.call_args[1]
+        call_kwargs = self.utility.es.create_pit.call_args.kwargs
         assert "allow_no_indices" not in call_kwargs
+        assert "allow_no_indices" not in call_kwargs["params"]
 
     def test_create_pit_applies_params_for_alias(self):
-        """create_point_in_time() should apply params for aliases (no wildcard in name)."""
+        """create_pit() should apply params for aliases (no wildcard in name)."""
         self.utility._pit(index="grq", body={"query": {"match_all": {}}})
-        call_kwargs = self.utility.es.create_point_in_time.call_args[1]
-        assert call_kwargs["ignore_unavailable"] is True
-        assert call_kwargs["expand_wildcards"] == "open"
+        call_params = self.utility.es.create_pit.call_args.kwargs["params"]
+        assert call_params["ignore_unavailable"] == "true"
+        assert call_params["expand_wildcards"] == "open"
 
     def test_create_pit_does_not_override_caller_params(self):
         """Caller-specified closed-index params should not be overridden."""
@@ -381,9 +387,9 @@ class TestOpenSearchPitMethod:
             ignore_unavailable=False,
             expand_wildcards="all",
         )
-        call_kwargs = self.utility.es.create_point_in_time.call_args[1]
-        assert call_kwargs["ignore_unavailable"] is False
-        assert call_kwargs["expand_wildcards"] == "all"
+        call_params = self.utility.es.create_pit.call_args.kwargs["params"]
+        assert call_params["ignore_unavailable"] == "false"
+        assert call_params["expand_wildcards"] == "all"
 
     def test_pit_search_does_not_pass_indices_options(self):
         """_search calls with PIT must NOT include indicesOptions."""
@@ -413,7 +419,7 @@ class TestOpenSearchPitMethod:
         assert records[0]["_id"] == "1"
         assert records[1]["_id"] == "2"
         # Verify PIT was cleaned up
-        self.utility.es.delete_point_in_time.assert_called_once_with(
+        self.utility.es.delete_pit.assert_called_once_with(
             body={"pit_id": ["opensearch_pit_id_123"]}
         )
 
@@ -421,6 +427,43 @@ class TestOpenSearchPitMethod:
         """_pit() should raise RuntimeError when no index is provided."""
         with pytest.raises(RuntimeError, match="must specify a index/alias"):
             self.utility._pit(body={"query": {"match_all": {}}})
+
+
+class TestOpenSearchClientSurface:
+    """Bind the mocked PIT contract to the real installed opensearch-py client.
+
+    The tests above mock self.es, so they pass regardless of which client version
+    is installed -- which is exactly how an upstream client API removal shipped
+    undetected: opensearch-py 3.0 dropped create_point_in_time/delete_point_in_time
+    while OpenSearchUtility._pit() still called them. These assertions fail loudly
+    in CI if the methods _pit() depends on are dropped or reshaped again.
+    """
+
+    def test_pit_methods_exist_on_real_client(self):
+        """_pit() calls these directly -- they must exist on the installed client."""
+        from opensearchpy import OpenSearch
+
+        assert hasattr(OpenSearch, "create_pit")
+        assert hasattr(OpenSearch, "delete_pit")
+
+    def test_create_pit_accepts_index_and_params(self):
+        """_pit() passes index= and params= as keywords."""
+        import inspect
+
+        from opensearchpy import OpenSearch
+
+        sig = inspect.signature(OpenSearch.create_pit)
+        assert "index" in sig.parameters
+        assert "params" in sig.parameters
+
+    def test_delete_pit_accepts_body(self):
+        """_pit() cleans up with delete_pit(body=...)."""
+        import inspect
+
+        from opensearchpy import OpenSearch
+
+        sig = inspect.signature(OpenSearch.delete_pit)
+        assert "body" in sig.parameters
 
 
 class TestClosedIndexParamsConstant:
