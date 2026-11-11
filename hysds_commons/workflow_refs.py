@@ -76,7 +76,9 @@ def _event_outputs(event):
     if wo is None:
         return None
     if isinstance(wo, dict):
-        if isinstance(wo.get("outputs"), list):  # whole _workflow_outputs.json document
+        # whole _workflow_outputs.json document: identified by its "version" key, so
+        # an already-converted dict with an output literally named "outputs" isn't misread
+        if "version" in wo and isinstance(wo.get("outputs"), list):
             return outputs_to_dict(wo["outputs"])
         return copy.deepcopy(wo)  # already converted
     return outputs_to_dict(wo)

@@ -150,3 +150,10 @@ def test_context_with_event_feeds_pass_resolution():
     status = {"inputs": {}, "nodes": {"A": {"state": "running"}}}
     event = {"step_id": "A", "workflow_outputs": [{"name": "items", "value_s": ["q"]}]}
     assert resolve_binds(lin["nodes"]["pass_1"], build_context(status, event)) == {"outputs": ["q"]}
+
+
+def test_event_converted_dict_with_output_named_outputs_is_not_misread():
+    from hysds_commons.workflow_refs import build_context
+    ev = {"step_id": "pass_1", "workflow_outputs": {"outputs": ["a", "b"]}}
+    ctx = build_context({"inputs": {}, "nodes": {}}, ev)
+    assert ctx["nodes"]["pass_1"] == {"outputs": ["a", "b"]}
