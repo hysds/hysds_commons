@@ -6,8 +6,10 @@ from hysds_commons.workflow_examples import linear_spec, scatter_gather_spec
 from hysds_commons.workflow_spec import (
     WorkflowSpecError,
     ancestors,
+    DEFAULT_WORKFLOW_CONNECTORS,
     check_spec,
     predecessors,
+    resolve_connectors,
     spec_doc_id,
     topo_order,
     validate_run_inputs,
@@ -91,7 +93,10 @@ CASES = [
     ("scatter-child-not-job", scatter_gather_spec, lambda s: s["nodes"]["scatter_1"].update(child="pass_2"), "child 'pass_2' must be a job"),
     ("scatter-bad-threshold-zero", scatter_gather_spec, lambda s: s["nodes"]["scatter_1"].update(completion={"threshold": 0}), "(0, 1]"),
     ("scatter-bad-threshold-high", scatter_gather_spec, lambda s: s["nodes"]["scatter_1"].update(completion={"threshold": 1.5}), "(0, 1]"),
-    ("scatter-over-literal", scatter_gather_spec, lambda s: s["nodes"]["scatter_1"].update(over="items"), "'over' is required"),
+    ("scatter-over-missing", scatter_gather_spec, lambda s: s["nodes"]["scatter_1"].pop("over"), "'over' is required"),
+    ("job-with-connector", linear_spec, lambda s: s["nodes"]["A"].update(connector="job-x:v1"), "unknown field 'connector'"),
+    ("pass-empty-connector", linear_spec, lambda s: s["nodes"]["pass_1"].update(connector=""), "'connector' must be a non-empty string"),
+    ("scatter-bad-connector-queue", scatter_gather_spec, lambda s: s["nodes"]["scatter_1"].update(connector_queue=3), "'connector_queue' must be a string"),
     (
         "two-scatters-same-child",
         scatter_gather_spec,
@@ -269,3 +274,72 @@ def test_run_inputs_default_is_copied():
     r, _ = validate_run_inputs(s, {"n": 1})
     r["l"].append("b")
     assert s["inputs"]["l"]["default"] == ["a"]
+
+
+# ---- pluggable connectors (contract §11)
+
+def test_over_accepts_literal_and_ref():
+    for over in ("items", ["a", "b"], "$.A.items", "s3://bucket/manifest.json"):
+        s = scatter_gather_spec()
+        s["nodes"]["scatter_1"]["over"] = over
+        assert validate_spec(s) == [], over
+
+
+def test_connector_fields_accepted_on_pluggable_kinds():
+    s = scatter_gather_spec()
+    for nid in ("pass_2", "scatter_1", "gather_1"):
+        s["nodes"][nid].update(connector="job-x:v1", connector_queue="q")
+    assert validate_spec(s) == []
+
+
+def test_default_connectors_shape():
+    assert set(DEFAULT_WORKFLOW_CONNECTORS) == {"pass", "scatter", "gather"}
+    assert DEFAULT_WORKFLOW_CONNECTORS["scatter"] == {
+        "default": "job-workflow-scatter:v1.0.0",
+        "allowed": {"job-workflow-scatter:v1.0.0": "workflow-connector-scatter"}}
+
+
+def test_resolve_fills_defaults_and_does_not_mutate():
+    s = scatter_gather_spec()
+    before = copy.deepcopy(s)
+    r, errs = resolve_connectors(s, DEFAULT_WORKFLOW_CONNECTORS)
+    assert errs == [] and s == before and r is not s
+    for nid, n in r["nodes"].items():
+        if n["kind"] in ("pass", "scatter", "gather"):
+            k = n["kind"]
+            assert n["connector"] == "job-workflow-%s:v1.0.0" % k
+            assert n["connector_queue"] == "workflow-connector-%s" % k
+        else:
+            assert "connector" not in n
+    assert validate_spec(r) == []
+
+
+def test_resolve_overwrites_author_queue_and_keeps_allowed_connector():
+    cfg = copy.deepcopy(DEFAULT_WORKFLOW_CONNECTORS)
+    cfg["scatter"]["allowed"]["job-mission-scatter:v2"] = "mission-q"
+    s = scatter_gather_spec()
+    s["nodes"]["scatter_1"].update(connector="job-mission-scatter:v2", connector_queue="evil")
+    s["nodes"]["pass_2"].update(connector_queue="evil")
+    r, errs = resolve_connectors(s, cfg)
+    assert errs == []
+    assert r["nodes"]["scatter_1"]["connector"] == "job-mission-scatter:v2"
+    assert r["nodes"]["scatter_1"]["connector_queue"] == "mission-q"
+    assert r["nodes"]["pass_2"]["connector_queue"] == "workflow-connector-pass"
+
+
+def test_resolve_rejects_disallowed_and_names_kind_and_allowed():
+    s = scatter_gather_spec()
+    s["nodes"]["gather_1"]["connector"] = "job-rogue:v1"
+    _, errs = resolve_connectors(s, DEFAULT_WORKFLOW_CONNECTORS)
+    assert len(errs) == 1
+    assert "gather_1" in errs[0] and "gather" in errs[0] and "job-workflow-gather:v1.0.0" in errs[0]
+    # a pass connector is not allowed for a gather node
+    s["nodes"]["gather_1"]["connector"] = "job-workflow-pass:v1.0.0"
+    assert resolve_connectors(s, DEFAULT_WORKFLOW_CONNECTORS)[1]
+
+
+def test_resolve_missing_kind_in_config_is_error():
+    cfg = {k: v for k, v in DEFAULT_WORKFLOW_CONNECTORS.items() if k != "scatter"}
+    _, errs = resolve_connectors(scatter_gather_spec(), cfg)
+    assert len(errs) == 1 and "scatter_1" in errs[0] and "scatter" in errs[0]
+    assert resolve_connectors(linear_spec(), {})[1]  # linear has a pass node

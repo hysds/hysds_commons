@@ -27,11 +27,24 @@ DEFAULT_FIELDS = {"queue", "timeout_hours", "max_retries", "retry_on"}
 JOB_OPTIONAL = {"queue", "max_retries", "retry_on", "timeout_hours"}
 # free-text documentation fields allowed on every node kind
 NODE_DOC_FIELDS = {"label", "description"}
+# pluggable connector fields (contract §11); not allowed on job nodes
+CONNECTOR_FIELDS = {"connector", "connector_queue"}
+PLUGGABLE_KINDS = ("pass", "scatter", "gather")
 NODE_FIELDS = {
     "job": {"kind", "run", "in", "out", "next"} | JOB_OPTIONAL | NODE_DOC_FIELDS,
-    "pass": {"kind", "bind", "next"} | NODE_DOC_FIELDS,
-    "scatter": {"kind", "child", "over", "completion", "next"} | NODE_DOC_FIELDS,
-    "gather": {"kind", "collect", "next"} | NODE_DOC_FIELDS,
+    "pass": {"kind", "bind", "next"} | NODE_DOC_FIELDS | CONNECTOR_FIELDS,
+    "scatter": {"kind", "child", "over", "completion", "next"} | NODE_DOC_FIELDS | CONNECTOR_FIELDS,
+    "gather": {"kind", "collect", "next"} | NODE_DOC_FIELDS | CONNECTOR_FIELDS,
+}
+
+# Deployment allowlist default (contract §11.2); mozart's WORKFLOW_CONNECTORS setting mirrors it.
+DEFAULT_WORKFLOW_CONNECTORS = {
+    "pass": {"default": "job-workflow-pass:v1.0.0",
+             "allowed": {"job-workflow-pass:v1.0.0": "workflow-connector-pass"}},
+    "scatter": {"default": "job-workflow-scatter:v1.0.0",
+                "allowed": {"job-workflow-scatter:v1.0.0": "workflow-connector-scatter"}},
+    "gather": {"default": "job-workflow-gather:v1.0.0",
+               "allowed": {"job-workflow-gather:v1.0.0": "workflow-connector-gather"}},
 }
 # kinds allowed as the single `next` target, per source kind
 NEXT_KINDS = {"job": ("pass", "scatter"), "pass": ("job",), "scatter": ("gather",), "gather": ("pass",)}
@@ -313,8 +326,8 @@ def _validate_kind_fields(nid, node, kind, where, errors):
     elif kind == "scatter":
         if not (isinstance(node.get("child"), str) and node["child"]):
             errors.append("%s: 'child' is required and must be a node id" % where)
-        if not is_ref(node.get("over")):
-            errors.append("%s: 'over' is required and must be a '$.' ref, got %r" % (where, node.get("over")))
+        if "over" not in node:  # any $-ref or literal (§11.5); its meaning belongs to the connector
+            errors.append("%s: 'over' is required" % where)
         if "completion" in node:
             c = node["completion"]
             if not isinstance(c, dict):
@@ -324,7 +337,12 @@ def _validate_kind_fields(nid, node, kind, where, errors):
                     errors.append("%s: completion has unknown field '%s'" % (where, f))
                 if "threshold" in c and not (_is_num(c["threshold"]) and 0 < c["threshold"] <= 1):
                     errors.append("%s: completion.threshold must be a number in (0, 1], got %r" % (where, c["threshold"]))
-    elif kind == "gather":
+    if kind in PLUGGABLE_KINDS:
+        if "connector" in node and not (isinstance(node["connector"], str) and node["connector"]):
+            errors.append("%s: 'connector' must be a non-empty string" % where)
+        if "connector_queue" in node and not isinstance(node["connector_queue"], str):
+            errors.append("%s: 'connector_queue' must be a string" % where)
+    if kind == "gather":
         c = node.get("collect")
         items = c if isinstance(c, list) else [c]
         if c is None or not items or not all(is_ref(i) for i in items):
@@ -531,6 +549,40 @@ def _validate_refs(spec, errors):
         for name, ref in outs.items():
             if is_ref(ref):
                 _check_ref(spec, ref, "spec outputs field '%s'" % name, None, errors, None, child_ids)
+
+
+def resolve_connectors(spec, config):
+    """Contract §11.3 rules 1 and 3. Returns ``(resolved_spec, errors)``; ``spec`` is not mutated.
+
+    For each pass/scatter/gather node: an absent ``connector`` becomes the kind's ``default``;
+    a ``connector`` outside the kind's ``allowed`` is an error; ``connector_queue`` is always
+    (over)written from ``allowed``. ``config`` is the ``WORKFLOW_CONNECTORS`` shape (§11.2).
+    """
+    resolved = copy.deepcopy(spec)
+    errors = []
+    nodes = resolved.get("nodes") if isinstance(resolved, dict) else None
+    if not isinstance(nodes, dict):
+        return resolved, errors
+    config = config or {}
+    for nid, node in nodes.items():
+        if not isinstance(node, dict) or node.get("kind") not in PLUGGABLE_KINDS:
+            continue
+        kind = node["kind"]
+        entry = config.get(kind)
+        allowed = entry.get("allowed") if isinstance(entry, dict) else None
+        if not isinstance(allowed, dict) or not allowed:
+            errors.append("node '%s' (%s): no connectors configured for kind '%s'" % (nid, kind, kind))
+            continue
+        conn = node.get("connector")
+        if conn is None:
+            conn = entry.get("default")
+        if conn not in allowed:
+            errors.append("node '%s' (%s): connector %r is not allowed for kind '%s'; allowed: %s"
+                          % (nid, kind, conn, kind, sorted(allowed)))
+            continue
+        node["connector"] = conn
+        node["connector_queue"] = allowed[conn]
+    return resolved, errors
 
 
 def validate_spec(spec):
