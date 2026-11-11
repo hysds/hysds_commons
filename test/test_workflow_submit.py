@@ -65,3 +65,28 @@ def test_no_url(monkeypatch):
 def test_errors(resp, exc, match):
     with pytest.raises(ws.WorkflowSubmitError, match=match):
         ws.submit_workflow_job("t", "q", {}, WF, mozart_rest_url="http://m", session=Session(resp, exc))
+
+
+# ------------------------------------------------------------------ slice 4.1: retry submission
+def test_untagged_submit_without_dedup_omits_workflow_field():
+    s = Session(Resp(200, {"success": True, "result": "pid"}))
+    ws.submit_workflow_job("job-lw-mozart-retry:v1", ws.RETRY_QUEUE, ws.retry_params("jid", 3), None,
+                           mozart_rest_url="http://m/api/v0.1", session=s, enable_dedup=False)
+    f = s.calls[0][1]["data"]
+    assert "workflow" not in f
+    assert f["enable_dedup"] == "false"
+    assert json.loads(f["tags"]) == []
+    assert f["type"] == "job-lw-mozart-retry:v1" and f["queue"] == "system-jobs-queue"
+
+
+def test_tagged_submit_unchanged_dedup_on_by_default():
+    s = Session(Resp(200, {"success": True, "result": "pid"}))
+    ws.submit_workflow_job("t", "q", {}, WF, mozart_rest_url="http://m", session=s)
+    f = s.calls[0][1]["data"]
+    assert f["enable_dedup"] == "true" and json.loads(f["workflow"]) == WF
+
+
+def test_retry_params_shape():
+    assert ws.retry_params("jid", 3) == {"retry_job_id": "jid", "retry_count_max": 3,
+                                         "job_priority_increment": 0, "workflow_retry": True}
+    assert ws.RETRY_JOB_TYPE == "job-lw-mozart-retry"

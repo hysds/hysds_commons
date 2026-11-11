@@ -343,3 +343,110 @@ def test_resolve_missing_kind_in_config_is_error():
     _, errs = resolve_connectors(scatter_gather_spec(), cfg)
     assert len(errs) == 1 and "scatter_1" in errs[0] and "scatter" in errs[0]
     assert resolve_connectors(linear_spec(), {})[1]  # linear has a pass node
+
+
+# ------------------------------------------------------------------ slice 4.1: retry policy
+from hysds_commons.workflow_spec import error_class_matches, is_retryable, retry_policy  # noqa: E402
+
+
+@pytest.mark.parametrize("pat", [
+    "*", "timeout", "signal", "offline", "worker", "exit_code:*", "exit_code:1", "exit_code:137",
+    "exit_code:-15", "pge:transient", "pge:a.b:c-d_1", "pge:*", "pge:" + "x" * 64,
+])
+def test_retry_on_valid_patterns(pat):
+    s = linear_spec()
+    s["nodes"]["A"]["max_retries"] = 1
+    s["nodes"]["A"]["retry_on"] = [pat]
+    s["defaults"]["retry_on"] = [pat]
+    assert validate_spec(s) == []
+
+
+@pytest.mark.parametrize("pat", [
+    "", "exit_code:", "exit_code:abc", "exit_code:1*", "exit", "timeout:5", "pge:", "pge:bad token",
+    "pge:" + "x" * 65, "pge:a/b", "Timeout", "**", "worker:*", 5,
+])
+def test_retry_on_invalid_patterns(pat):
+    s = linear_spec()
+    s["nodes"]["A"]["retry_on"] = [pat]
+    errs = validate_spec(s)
+    assert errs and any("retry_on" in e for e in errs)
+    s = linear_spec()
+    s["defaults"]["retry_on"] = [pat]
+    assert any("retry_on" in e for e in validate_spec(s))
+
+
+def test_retry_fields_validation_shapes():
+    for field, bad in [("max_retries", -1), ("max_retries", 1.5), ("max_retries", "2"), ("max_retries", True),
+                       ("retry_on", "exit_code:*"), ("retry_on", {"a": 1})]:
+        for where in ("node", "defaults"):
+            s = linear_spec()
+            (s["nodes"]["A"] if where == "node" else s["defaults"])[field] = bad
+            assert any(field in e for e in validate_spec(s)), (field, bad, where)
+    s = linear_spec()
+    s["nodes"]["A"].update(max_retries=0, retry_on=[])
+    assert validate_spec(s) == []
+
+
+def test_retry_policy_precedence():
+    s = linear_spec()
+    s["defaults"] = {"queue": "q", "max_retries": 3, "retry_on": ["timeout"]}
+    assert retry_policy(s, "A") == {"max_retries": 3, "retry_on": ["timeout"]}
+    s["nodes"]["A"]["max_retries"] = 1
+    assert retry_policy(s, "A") == {"max_retries": 1, "retry_on": ["timeout"]}
+    s["nodes"]["A"]["retry_on"] = ["*"]
+    assert retry_policy(s, "A") == {"max_retries": 1, "retry_on": ["*"]}
+    s["nodes"]["A"]["retry_on"] = []  # explicit empty overrides defaults
+    assert retry_policy(s, "A")["retry_on"] == []
+
+
+def test_retry_policy_absent_is_zero_empty_and_does_not_alias():
+    s = linear_spec()
+    s.pop("defaults", None)
+    assert retry_policy(s, "A") == {"max_retries": 0, "retry_on": []}
+    assert retry_policy(s, "nope") == {"max_retries": 0, "retry_on": []}
+    assert retry_policy(None, "A") == {"max_retries": 0, "retry_on": []}
+    s["nodes"]["A"]["retry_on"] = ["*"]
+    retry_policy(s, "A")["retry_on"].append("x")
+    assert s["nodes"]["A"]["retry_on"] == ["*"]
+
+
+@pytest.mark.parametrize("pats,ec,expected", [
+    (["*"], "worker", True),
+    (["*"], None, True),
+    (["exit_code:*"], "exit_code:1", True),
+    (["exit_code:*"], "exit_code:-9", True),
+    (["exit_code:*"], "timeout", False),
+    (["exit_code:*"], "pge:x", False),
+    (["exit_code:1"], "exit_code:1", True),
+    (["exit_code:1"], "exit_code:10", False),
+    (["timeout", "offline"], "offline", True),
+    (["timeout"], "signal", False),
+    (["pge:transient"], "pge:transient", True),
+    (["pge:transient"], "pge:other", False),
+    (["pge:*"], "pge:anything", True),
+    (["pge:*"], "exit_code:1", False),
+    (["exit_code:*"], None, False),
+    (["exit_code:*"], "", False),
+    ([], "worker", False),
+    (None, "worker", False),
+])
+def test_error_class_matches(pats, ec, expected):
+    assert error_class_matches(pats, ec) is expected
+
+
+@pytest.mark.parametrize("count,mx,ec,pats,expected", [
+    (0, 2, "exit_code:1", ["exit_code:*"], True),
+    (1, 2, "exit_code:1", ["exit_code:*"], True),
+    (2, 2, "exit_code:1", ["exit_code:*"], False),
+    (3, 2, "exit_code:1", ["exit_code:*"], False),
+    (0, 0, "exit_code:1", ["*"], False),
+    (0, 2, "timeout", ["exit_code:*"], False),
+    (None, 1, "worker", ["*"], True),
+    (True, 1, "worker", ["*"], True),  # bool is not a count: treated as 0
+])
+def test_is_retryable(count, mx, ec, pats, expected):
+    assert is_retryable({"max_retries": mx, "retry_on": pats}, ec, count) is expected
+
+
+def test_is_retryable_empty_policy():
+    assert is_retryable({}, "worker", 0) is False

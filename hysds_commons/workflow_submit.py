@@ -58,12 +58,13 @@ def _default_tags(workflow):
 
 def submit_workflow_job(job_type, queue, params, workflow, priority=5, tags=None,
                         username=None, job_name=None, mozart_rest_url=None,
-                        session=None, timeout=DEFAULT_TIMEOUT, verify=False):
+                        session=None, timeout=DEFAULT_TIMEOUT, verify=False, enable_dedup=True):
     """Submit one workflow-tagged job via mozart ``POST /job/submit``; return its
     payload id (the job_status doc _id).
 
     ``mozart_rest_url`` is the API base, e.g. ``http://mozart:8888/api/v0.1``. It
-    defaults to ``$MOZART_REST_URL``. Raises :class:`WorkflowSubmitError` on a
+    defaults to ``$MOZART_REST_URL``. ``workflow=None`` submits an untagged job (the retry job,
+    which must not emit workflow events itself) and ``enable_dedup=False`` skips dedup. Raises :class:`WorkflowSubmitError` on a
     transport error or ``success: false``.
     """
     base = (mozart_rest_url or os.environ.get(MOZART_REST_URL_ENV) or "").rstrip("/")
@@ -74,11 +75,12 @@ def submit_workflow_job(job_type, queue, params, workflow, priority=5, tags=None
         "type": job_type,
         "queue": queue,
         "priority": str(priority),
-        "tags": json.dumps(tags if tags is not None else _default_tags(workflow)),
+        "tags": json.dumps(tags if tags is not None else (_default_tags(workflow) if workflow else [])),
         "params": json.dumps(params or {}),
-        "enable_dedup": "true",
-        "workflow": json.dumps(workflow),
+        "enable_dedup": "true" if enable_dedup else "false",
     }
+    if workflow:
+        form["workflow"] = json.dumps(workflow)
     if username:
         form["username"] = username
     if job_name:
@@ -116,6 +118,21 @@ def submit_workflow_job_inprocess(job_type, queue, params, workflow, priority=5,
         workflow=workflow,
     )
     return submit_hysds_job(job)
+
+
+RETRY_JOB_TYPE = "job-lw-mozart-retry"
+RETRY_QUEUE = "system-jobs-queue"  # required_queues of the lw-mozart-retry job_spec
+
+
+def retry_params(job_id, max_retries):
+    """Params for mozart's ``job-lw-mozart-retry`` as issued by the consumer (contract 12.3).
+    ``workflow_retry`` lets retry.py's D5 guard (12.4) accept a workflow-tagged job."""
+    return {
+        "retry_job_id": job_id,
+        "retry_count_max": max_retries,
+        "job_priority_increment": 0,
+        "workflow_retry": True,
+    }
 
 
 def connector_params(run_id, step_id, spec_id, workflow_event):

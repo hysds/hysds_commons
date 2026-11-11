@@ -61,6 +61,12 @@ class WorkflowSpecError(Exception):
 # --------------------------------------------------------------------------- helpers
 
 
+# contract 12.1/12.2: error classes a failed attempt can carry, and the retry_on patterns over them
+RETRY_ON_RE = re.compile(
+    r"^(\*|timeout|signal|offline|worker|exit_code:(-?\d+|\*)|pge:([A-Za-z0-9_:.-]{1,64}|\*))$"
+)
+
+
 def _is_int(v):
     return isinstance(v, int) and not isinstance(v, bool)
 
@@ -217,6 +223,12 @@ def _validate_optional_job_fields(obj, where, errors):
         isinstance(obj["retry_on"], list) and all(isinstance(x, str) for x in obj["retry_on"])
     ):
         errors.append("%s: 'retry_on' must be a list of strings" % where)
+    elif "retry_on" in obj:
+        for x in obj["retry_on"]:
+            if not RETRY_ON_RE.match(x):
+                errors.append(
+                    "%s: 'retry_on' entry %r is not a valid error class pattern "
+                    "(exit_code:<n>|exit_code:*|timeout|signal|offline|worker|pge:<token>|*)" % (where, x))
     if "timeout_hours" in obj and not (_is_num(obj["timeout_hours"]) and obj["timeout_hours"] > 0):
         errors.append("%s: 'timeout_hours' must be a number > 0" % where)
 
@@ -583,6 +595,35 @@ def resolve_connectors(spec, config):
         node["connector"] = conn
         node["connector_queue"] = allowed[conn]
     return resolved, errors
+
+
+def retry_policy(spec, node_id):
+    """Effective ``{"max_retries": int, "retry_on": [str]}`` for a job node (contract 12.2):
+    node value, else ``spec.defaults``, else ``0`` / ``[]``. Pure."""
+    node = ((spec or {}).get("nodes") or {}).get(node_id) or {}
+    defaults = (spec or {}).get("defaults") or {}
+    max_retries = node["max_retries"] if "max_retries" in node else defaults.get("max_retries", 0)
+    retry_on = node["retry_on"] if "retry_on" in node else defaults.get("retry_on", [])
+    return {"max_retries": max_retries, "retry_on": list(retry_on or [])}
+
+
+def error_class_matches(retry_on, error_class):
+    """True if ``error_class`` matches any ``retry_on`` pattern (``*``, ``exit_code:*``, ``pge:*``
+    are wildcards; everything else is an exact match). A missing class matches only ``*``."""
+    if not isinstance(error_class, str) or not error_class:
+        return "*" in (retry_on or [])  # an event with no class (old producer) only matches "*"
+    for pat in retry_on or []:
+        if pat == "*" or pat == error_class:
+            return True
+        if pat.endswith(":*") and error_class.startswith(pat[:-1]):
+            return True
+    return False
+
+
+def is_retryable(policy, error_class, retry_count):
+    """Contract 12.2: retryable iff ``retry_count < max_retries`` and the class matches ``retry_on``."""
+    count = retry_count if _is_int(retry_count) else 0
+    return count < policy.get("max_retries", 0) and error_class_matches(policy.get("retry_on"), error_class)
 
 
 def validate_spec(spec):
