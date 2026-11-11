@@ -357,9 +357,23 @@ def resolve_mozart_job(product, rule, hysdsio=None, queue=None, component=None):
     return job
 
 
+def validate_workflow(workflow):
+    """Normalize an optional workflow tag (dict or JSON string). Returns None if falsy."""
+    if workflow is None or workflow == "" or workflow == {}:
+        return None
+    if isinstance(workflow, str):
+        workflow = json.loads(workflow)
+    if not isinstance(workflow, dict):
+        raise RuntimeError(f"Invalid arg type 'workflow': {type(workflow)} {workflow}")
+    for k in ("run_id", "step_id"):
+        if not workflow.get(k):
+            raise RuntimeError(f"'workflow' must specify '{k}'")
+    return workflow
+
+
 def resolve_hysds_job(job_type=None, queue=None, priority=None, tags=None, params=None, job_name=None,
                       payload_hash=None, enable_dedup=True, username=None, soft_time_limit=None, time_limit=None,
-                      disk_usage=None, publish_overwrite_ok=False):
+                      disk_usage=None, publish_overwrite_ok=False, workflow=None):
     """
     Resolve HySDS job JSON.
     @param job_type - type of the job spec to go find
@@ -375,6 +389,8 @@ def resolve_hysds_job(job_type=None, queue=None, priority=None, tags=None, param
     @param time_limit - hard time limit for job execution
     @param disk_usage - disk usage for PGE (KB, MB, GB, etc)
     @param publish_overwrite_ok - enable a job to overwrite an existing dataset on publish
+    @param workflow - (optional) workflow tag dict {run_id, step_id, spec_id, child_index, child_total};
+                      set as top-level job["workflow"]; run_id and step_id are required
     """
     if job_type is None:
         raise RuntimeError("'type' must be supplied in request")
@@ -388,6 +404,7 @@ def resolve_hysds_job(job_type=None, queue=None, priority=None, tags=None, param
         pass
     else:
         raise RuntimeError(f"Invalid arg type 'params': {type(params)} {params}")
+    workflow = validate_workflow(workflow)
 
     # pull mozart job and container specs
     specification = mozart_es.get_by_id(index='job_specs', id=job_type)
@@ -470,6 +487,8 @@ def resolve_hysds_job(job_type=None, queue=None, priority=None, tags=None, param
         job["payload_hash"] = payload_hash
     if username is not None:
         job["username"] = username
+    if workflow is not None:
+        job["workflow"] = workflow
     if isinstance(tags, (str,)):  # deserialize tags, if needed
         tags = json.loads(tags)
     if tags is not None:
@@ -511,7 +530,7 @@ def submit_hysds_job(job):
 
 
 def submit_mozart_job(product, rule, hysdsio=None, queue=None, job_name=None, payload_hash=None, enable_dedup=None,
-                      soft_time_limit=None, time_limit=None, component=None):
+                      soft_time_limit=None, time_limit=None, component=None, workflow=None):
     """
     Resolve a Mozart job to a HySDS job and submit via celery
     @param product - product result body
@@ -524,6 +543,7 @@ def submit_mozart_job(product, rule, hysdsio=None, queue=None, job_name=None, pa
     @param soft_time_limit - (optional) soft time limit for job execution
     @param time_limit - (optional) hard time limit for job execution
     @param component - tosca/grq or mozart/figaro, retrieve hysds_io from ES index (hysds_ios-mozart vs hysds_ios-grq)
+    @param workflow - (optional) workflow tag dict; see resolve_hysds_job
     """
 
     # raise if using deprecated keywords; TODO: remove in future release
@@ -549,7 +569,8 @@ def submit_mozart_job(product, rule, hysdsio=None, queue=None, job_name=None, pa
                             enable_dedup=moz_job['enable_dedup'],
                             username=moz_job['username'],
                             soft_time_limit=moz_job['soft_time_limit'], time_limit=moz_job['time_limit'],
-                            disk_usage=moz_job['disk_usage'])
+                            disk_usage=moz_job['disk_usage'],
+                            workflow=workflow)
     logger.info(f"resolved HySDS job: {json.dumps(job, indent=2)}")
 
     # submit hysds job
