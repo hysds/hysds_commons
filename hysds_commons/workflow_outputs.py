@@ -19,6 +19,18 @@ The file holds a **typed key/value list**, not a free-form dict::
        {"name": "items",           "value_s": ["a.h5", "b.h5"]}
      ]}
 
+An entry may also carry an optional ``"class"`` of ``"File"`` or ``"Directory"``,
+marking its ``value_s`` strings as **dataset/file references**::
+
+     {"name": "result", "class": "Directory", "value_s": "my_product_dir"}
+     {"name": "parts",  "class": "File", "value_s": ["p1/a.tif", "p1/b.tif"]}
+
+A class entry must use the ``value_s`` slot (one non-empty string, or a list of
+them). The paths are **local, relative to the job directory**; after the job's
+products are published, hysds rewrites each one to the published object-store
+URL (``s3://bucket/key/relative/path``) before the outputs are indexed and sent
+on the workflow queue. Entries without ``class`` are untouched.
+
 The producer picks the typed slot at write time, which fixes the indexed-field
 count at 4 regardless of how many workflows or output names exist, and rules out
 cross-workflow type conflicts.
@@ -50,8 +62,15 @@ logger = logging.getLogger(__name__)
 WORKFLOW_OUTPUTS_FILE = "_workflow_outputs.json"
 
 # ADR-003 size cap: the bindings ride a queue message, so they must stay small.
-# Bindings are scalars and dataset refs only, never payloads.
-MAX_WORKFLOW_OUTPUTS_SIZE = 16 * 1024
+# Bindings are scalars and dataset refs only, never payloads. Configurable via
+# the ``WORKFLOW_OUTPUTS_MAX_BYTES`` setting; this is the default.
+DEFAULT_WORKFLOW_OUTPUTS_MAX_BYTES = 512 * 1024
+
+# backward-compatible alias for the default cap
+MAX_WORKFLOW_OUTPUTS_SIZE = DEFAULT_WORKFLOW_OUTPUTS_MAX_BYTES
+
+# allowed values of the optional per-entry "class" key
+OUTPUT_CLASSES = ("File", "Directory")
 
 # the only schema version this parser understands
 SUPPORTED_VERSION = "1.0"
@@ -78,10 +97,12 @@ def get_workflow_outputs_file(job_dir):
     return os.path.join(job_dir, WORKFLOW_OUTPUTS_FILE)
 
 
-def read_workflow_outputs(job_dir):
+def read_workflow_outputs(job_dir, max_bytes=None):
     """Read and validate ``_workflow_outputs.json`` from a job directory root.
 
     :param job_dir: the job directory (the PGE's cwd)
+    :param max_bytes: size cap in bytes (the ``WORKFLOW_OUTPUTS_MAX_BYTES``
+        setting); defaults to :data:`DEFAULT_WORKFLOW_OUTPUTS_MAX_BYTES`
     :returns: the list of validated binding dicts, in file order. An empty list
         means either the file is absent (the common, non-workflow case) or it
         declared no outputs.
@@ -89,19 +110,21 @@ def read_workflow_outputs(job_dir):
         or schema-invalid.
     """
     outputs_file = get_workflow_outputs_file(job_dir)
+    if max_bytes is None:
+        max_bytes = DEFAULT_WORKFLOW_OUTPUTS_MAX_BYTES
 
     # absence is not an error -- non-workflow jobs never write this file
     if not os.path.exists(outputs_file):
         return []
 
     size = os.path.getsize(outputs_file)
-    if size > MAX_WORKFLOW_OUTPUTS_SIZE:
+    if size > max_bytes:
         raise WorkflowOutputsError(
-            "{} is {} bytes, over the {} byte limit. Workflow output bindings "
-            "ride a queue message, so they must be scalars and dataset "
-            "references only, never payloads. Write the payload as a dataset "
-            "and bind its reference instead.".format(
-                outputs_file, size, MAX_WORKFLOW_OUTPUTS_SIZE
+            "{} is {} bytes, over the {} byte limit (WORKFLOW_OUTPUTS_MAX_BYTES). "
+            "Workflow output bindings ride a queue message, so they must be "
+            "scalars and dataset references only, never payloads. Write the "
+            "payload as a dataset and bind its reference instead.".format(
+                outputs_file, size, max_bytes
             )
         )
 
@@ -118,6 +141,26 @@ def read_workflow_outputs(job_dir):
     outputs = parse_workflow_outputs(doc, source=outputs_file)
     logger.info(f"Read {len(outputs)} workflow output binding(s) from {outputs_file}")
     return outputs
+
+
+def check_workflow_outputs_size(outputs, max_bytes=None):
+    """Raise if the serialized outputs list exceeds the size cap.
+
+    Serializes as compact JSON, the way the list rides in the workflow event.
+    Used after hysds rewrites class paths to (longer) published URLs.
+
+    :raises WorkflowOutputsError: serialized size is over ``max_bytes``
+    """
+    if max_bytes is None:
+        max_bytes = DEFAULT_WORKFLOW_OUTPUTS_MAX_BYTES
+    size = len(json.dumps(outputs, separators=(",", ":")).encode("utf-8"))
+    if size > max_bytes:
+        raise WorkflowOutputsError(
+            f"Workflow outputs are {size} bytes once serialized, over the "
+            f"{max_bytes} byte limit (WORKFLOW_OUTPUTS_MAX_BYTES). They ride a "
+            f"queue message, so bind dataset references, never payloads."
+        )
+    return size
 
 
 def parse_workflow_outputs(doc, source=WORKFLOW_OUTPUTS_FILE):
@@ -219,7 +262,32 @@ def _parse_entry(entry, i, source):
     value = entry[slot]
     _validate_value(value, slot, name, where)
 
-    return {"name": name, slot: value}
+    result = {"name": name, slot: value}
+
+    if "class" in entry:
+        cls = entry["class"]
+        if not isinstance(cls, str) or cls not in OUTPUT_CLASSES:
+            raise WorkflowOutputsError(
+                f"{where} ({name!r}): unknown 'class' {cls!r}; allowed values "
+                f"are {', '.join(repr(c) for c in OUTPUT_CLASSES)}."
+            )
+        if slot != "value_s":
+            raise WorkflowOutputsError(
+                f"{where} ({name!r}): an entry with 'class' {cls!r} must use "
+                f"the 'value_s' slot (a path string or list of path strings), "
+                f"got {slot!r}."
+            )
+        paths = value if isinstance(value, list) else [value]
+        for j, path in enumerate(paths):
+            if path.strip() == "":
+                raise WorkflowOutputsError(
+                    f"{where} ({name!r}): {cls} path"
+                    f"{f' [{j}]' if isinstance(value, list) else ''} must be a "
+                    f"non-empty string."
+                )
+        result["class"] = cls
+
+    return result
 
 
 def _validate_value(value, slot, name, where):

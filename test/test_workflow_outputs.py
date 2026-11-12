@@ -10,9 +10,11 @@ import os
 import pytest
 
 from hysds_commons.workflow_outputs import (
+    DEFAULT_WORKFLOW_OUTPUTS_MAX_BYTES,
     MAX_WORKFLOW_OUTPUTS_SIZE,
     WORKFLOW_OUTPUTS_FILE,
     WorkflowOutputsError,
+    check_workflow_outputs_size,
     get_workflow_outputs_file,
     parse_workflow_outputs,
     read_workflow_outputs,
@@ -148,7 +150,7 @@ def test_malformed_json_fails_the_job(job_dir):
 
 
 def test_oversized_file_fails_the_job(job_dir):
-    """16KB cap -- the bindings ride a queue message."""
+    """Default cap (512KB) -- the bindings ride a queue message."""
     big = "x" * MAX_WORKFLOW_OUTPUTS_SIZE
     write_outputs(
         job_dir, {"version": "1.0", "outputs": [{"name": "blob", "value_s": big}]}
@@ -305,3 +307,89 @@ def test_parse_workflow_outputs_error_names_the_source():
     with pytest.raises(WorkflowOutputsError) as excinfo:
         parse_workflow_outputs({"version": "9"}, source="/jobs/abc/_workflow_outputs.json")
     assert "/jobs/abc/_workflow_outputs.json" in str(excinfo.value)
+
+
+# --- v1.1: class File/Directory, configurable cap ---------------------------
+
+
+def test_default_cap_is_512kb_with_backward_compatible_alias():
+    assert DEFAULT_WORKFLOW_OUTPUTS_MAX_BYTES == 512 * 1024
+    assert MAX_WORKFLOW_OUTPUTS_SIZE == DEFAULT_WORKFLOW_OUTPUTS_MAX_BYTES
+
+
+def test_max_bytes_override_rejects_smaller_file(job_dir):
+    write_outputs(
+        job_dir,
+        {"version": "1.0", "outputs": [{"name": "a", "value_s": "x" * 500}]},
+    )
+    assert len(read_workflow_outputs(job_dir)) == 1
+    with pytest.raises(WorkflowOutputsError) as excinfo:
+        read_workflow_outputs(job_dir, max_bytes=100)
+    assert "WORKFLOW_OUTPUTS_MAX_BYTES" in str(excinfo.value)
+    assert "100 byte" in str(excinfo.value)
+
+
+def test_max_bytes_override_allows_larger_than_default(job_dir):
+    big = "x" * (DEFAULT_WORKFLOW_OUTPUTS_MAX_BYTES + 10)
+    write_outputs(
+        job_dir, {"version": "1.0", "outputs": [{"name": "a", "value_s": big}]}
+    )
+    with pytest.raises(WorkflowOutputsError):
+        read_workflow_outputs(job_dir)
+    assert len(read_workflow_outputs(job_dir, max_bytes=2 * len(big))) == 1
+
+
+@pytest.mark.parametrize("cls", ["File", "Directory"])
+@pytest.mark.parametrize("value", ["prod_dir/a.tif", ["p1/a.tif", "p2/b.tif"]])
+def test_class_entries_valid_and_preserved(cls, value):
+    doc = {
+        "version": "1.0",
+        "outputs": [{"name": "r", "class": cls, "value_s": value}],
+    }
+    assert parse_workflow_outputs(doc) == [
+        {"name": "r", "class": cls, "value_s": value}
+    ]
+
+
+def test_entry_without_class_has_no_class_key():
+    doc = {"version": "1.0", "outputs": [{"name": "r", "value_s": "x"}]}
+    assert parse_workflow_outputs(doc) == [{"name": "r", "value_s": "x"}]
+
+
+@pytest.mark.parametrize(
+    "entry",
+    [
+        {"name": "r", "class": "File", "value_d": 1.0},
+        {"name": "r", "class": "Directory", "value_b": True},
+        {"name": "r", "class": "File", "value_d": [1, 2]},
+    ],
+)
+def test_class_requires_value_s_slot(entry):
+    with pytest.raises(WorkflowOutputsError, match="must use the 'value_s' slot"):
+        parse_workflow_outputs({"version": "1.0", "outputs": [entry]})
+
+
+@pytest.mark.parametrize("cls", ["file", "Dir", "", None, 3, ["File"]])
+def test_bad_class_rejected(cls):
+    entry = {"name": "r", "class": cls, "value_s": "x"}
+    with pytest.raises(WorkflowOutputsError, match="unknown 'class'"):
+        parse_workflow_outputs({"version": "1.0", "outputs": [entry]})
+
+
+@pytest.mark.parametrize("value", ["", "   ", ["ok", ""], [""]])
+def test_class_empty_path_rejected(value):
+    entry = {"name": "r", "class": "File", "value_s": value}
+    with pytest.raises(WorkflowOutputsError, match="non-empty"):
+        parse_workflow_outputs({"version": "1.0", "outputs": [entry]})
+
+
+def test_check_workflow_outputs_size():
+    outs = [{"name": "a", "value_s": "x" * 100}]
+    assert check_workflow_outputs_size(outs, max_bytes=1000) > 100
+    with pytest.raises(WorkflowOutputsError, match="WORKFLOW_OUTPUTS_MAX_BYTES"):
+        check_workflow_outputs_size(outs, max_bytes=50)
+    # default cap applies when max_bytes is omitted
+    check_workflow_outputs_size(outs)
+    big = [{"name": "a", "value_s": "x" * DEFAULT_WORKFLOW_OUTPUTS_MAX_BYTES}]
+    with pytest.raises(WorkflowOutputsError):
+        check_workflow_outputs_size(big)
