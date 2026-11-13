@@ -138,3 +138,89 @@ def test_ended_at_keeps_mutator_value_and_falls_back_to_now():
     update_status(es, "i", "r", lambda d: {**d, "status": "completed"})
     import re
     assert re.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z", es.doc["ended_at"])
+
+
+def test_duration_s_set_with_ended_at():
+    es = FakeES(_run(submitted_at="2026-01-02T03:04:00.000Z"))
+    update_status(es, "i", "r", lambda d: {**d, "status": "completed", "updated_at": "2026-01-02T03:05:30.250Z"})
+    assert es.doc["duration_s"] == 90.25
+    es = FakeES(_run())  # no submitted_at: no duration, no crash
+    update_status(es, "i", "r", lambda d: {**d, "status": "failed"})
+    assert "duration_s" not in es.doc and es.doc["ended_at"]
+
+
+def test_duration_s_not_set_for_non_terminal_or_already_terminal():
+    es = FakeES(_run(submitted_at="2026-01-02T03:04:00.000Z"))
+    update_status(es, "i", "r", lambda d: {**d, "error": "x"})
+    assert "duration_s" not in es.doc
+    es = FakeES(_run("failed", submitted_at="2026-01-02T03:04:00.000Z", ended_at="2026-01-02T03:04:10.000Z"))
+    update_status(es, "i", "r", lambda d: {**d, "error": "x"})
+    assert "duration_s" not in es.doc
+
+
+def _nrun(states, **kw):
+    return _run(nodes={k: {"state": v} for k, v in states.items()}, **kw)
+
+
+def test_current_nodes_follow_queued_and_running_nodes():
+    es = FakeES(_nrun({"A": "running", "B": "pending", "C": "pending"}))
+
+    def to_b(d):
+        d["nodes"]["A"]["state"] = "completed"
+        d["nodes"]["B"]["state"] = "queued"
+        d["updated_at"] = "2026-01-01T00:00:05.000Z"
+        return d
+    update_status(es, "i", "r", to_b)
+    assert es.doc["current_nodes"] == ["B"]
+
+
+def test_current_nodes_cleared_on_terminal():
+    es = FakeES(_nrun({"A": "running"}, current_nodes=["A"]))
+    update_status(es, "i", "r", lambda d: {**d, "status": "failed"})
+    assert es.doc["current_nodes"] == []
+
+
+def test_node_started_and_ended_at():
+    es = FakeES(_nrun({"A": "pending", "B": "pending"}))
+
+    def start(d):
+        d["nodes"]["A"]["state"] = "running"
+        d["updated_at"] = "2026-01-01T00:00:01.000Z"
+        return d
+    update_status(es, "i", "r", start)
+    assert es.doc["nodes"]["A"]["started_at"] == "2026-01-01T00:00:01.000Z"
+    assert "ended_at" not in es.doc["nodes"]["A"] and "started_at" not in es.doc["nodes"]["B"]
+
+    def finish(d):
+        d["nodes"]["A"].update(state="completed", completed_at="2026-01-01T00:00:03.000Z")
+        d["updated_at"] = "2026-01-01T00:00:04.000Z"
+        return d
+    update_status(es, "i", "r", finish)
+    assert es.doc["nodes"]["A"]["ended_at"] == "2026-01-01T00:00:03.000Z"  # the node's own completed_at wins
+
+    def fail(d):
+        d["nodes"]["A"]["state"] = "failed"  # already ended: untouched
+        d["updated_at"] = "2026-01-01T00:00:09.000Z"
+        return d
+    update_status(es, "i", "r", fail)
+    assert es.doc["nodes"]["A"]["ended_at"] == "2026-01-01T00:00:03.000Z"
+
+
+def test_node_times_keep_mutator_values_and_skip_unstarted_cancelled():
+    es = FakeES(_nrun({"A": "pending", "B": "pending"}))
+
+    def mut(d):
+        d["nodes"]["A"] = {"state": "completed", "started_at": "S", "ended_at": "E"}
+        d["nodes"]["B"]["state"] = "cancelled"
+        d["updated_at"] = "2026-01-01T00:00:09.000Z"
+        return d
+    update_status(es, "i", "r", mut)
+    assert es.doc["nodes"]["A"] == {"state": "completed", "started_at": "S", "ended_at": "E"}
+    assert es.doc["nodes"]["B"] == {"state": "cancelled"}
+
+
+def test_set_failure():
+    from hysds_commons.workflow_status import set_failure
+    assert set_failure({}, "A", "pge:oom") == {"failed_node": "A", "error_class": "pge:oom"}
+    assert set_failure({}, None, "cancelled") == {"error_class": "cancelled"}
+    assert set_failure({}, "A", None) == {"failed_node": "A", "error_class": "unknown"}

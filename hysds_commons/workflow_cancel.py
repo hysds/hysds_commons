@@ -17,6 +17,12 @@ import json
 import uuid
 from datetime import datetime, timezone
 
+from hysds_commons.workflow_status import (
+    ERROR_CLASS_CANCELLED,
+    ERROR_CLASS_TIMEOUT,
+    set_failure,
+)
+
 TERMINAL_JOB_STATUSES = frozenset(
     {"job-completed", "job-failed", "job-deduped", "job-offline", "job-revoked"}
 )
@@ -80,6 +86,8 @@ def cancel_mutate(user, status_value="cancelled", error=None, now=None):
     A running run gets ``status=status_value`` (``cancelled``, or ``failed`` for a
     timeout), ``error`` (default ``"cancelled by <user>"``) and every non-terminal node
     ``state=cancelled``. A run that is already terminal is left alone (returns None).
+    ``error_class`` is ``cancelled`` (no ``failed_node``) or, for the timeout, ``timeout`` with
+    ``failed_node`` = the first node that was running/queued when the run was timed out.
     """
     if status_value not in ("cancelled", "failed"):
         raise ValueError(f"cancel status must be cancelled or failed, got {status_value!r}")
@@ -90,6 +98,12 @@ def cancel_mutate(user, status_value="cancelled", error=None, now=None):
             return None
         doc["status"] = status_value
         doc["error"] = err
+        if status_value == "failed":
+            active = [nid for nid, n in (doc.get("nodes") or {}).items()
+                      if n.get("state") in ("running", "queued")]
+            set_failure(doc, active[0] if active else None, ERROR_CLASS_TIMEOUT)
+        else:
+            set_failure(doc, None, ERROR_CLASS_CANCELLED)
         for nid, node in (doc.get("nodes") or {}).items():
             if node.get("state") not in TERMINAL_NODE_STATES:
                 doc["nodes"][nid] = {**node, "state": "cancelled"}

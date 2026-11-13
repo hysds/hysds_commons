@@ -54,6 +54,20 @@ class WorkflowStatusConflict(WorkflowStatusError):
 
 
 TERMINAL_RUN_STATUSES = frozenset({"completed", "failed", "cancelled"})
+TERMINAL_NODE_STATES = frozenset({"completed", "failed", "cancelled"})
+STARTED_NODE_STATES = frozenset({"queued", "running"})
+
+# Run-level ``error_class`` (top-level, with ``failed_node``): a stable keyword saying what stopped the run.
+# A failed job's own class is passed through unchanged (``exit_code:<n>``, ``pge:<token>``, ``worker``,
+# ``signal``, ``offline``, ``timeout`` from log_utils.set_error_class); the run-level values are:
+ERROR_CLASS_TIMEOUT = "timeout"          # reaper: the run exceeded its timeout (also a job-level class)
+ERROR_CLASS_THRESHOLD = "threshold"      # scatter completed below its completion threshold
+ERROR_CLASS_CANCELLED = "cancelled"      # cancelled by a user (no failed_node)
+ERROR_CLASS_INPUT_RESOLUTION = "input_resolution"    # a node's $ref inputs/binds could not be resolved
+ERROR_CLASS_OUTPUT_RESOLUTION = "output_resolution"  # the spec outputs could not be resolved at finalize
+ERROR_CLASS_SUBMIT = "submit"            # mozart could not submit the entry job
+ERROR_CLASS_NO_QUEUE = "no_queue"        # no queue for a node
+ERROR_CLASS_UNKNOWN = "unknown"          # a failed event that carried no error_class
 
 
 def _now():
@@ -61,27 +75,77 @@ def _now():
 
 
 def _valid_ts(ts):
+    return _parse_ts(ts) is not None
+
+
+def _parse_ts(ts):
     if not isinstance(ts, str):
-        return False
+        return None
     try:
-        datetime.fromisoformat(ts.replace("Z", "+00:00"))
-        return True
+        dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
     except ValueError:
-        return False
+        return None
+    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
 
 
 def _stamp_ended_at(old, new):
-    """Set ``ended_at`` when ``new`` moves a run from non-terminal to terminal.
+    """Set ``ended_at`` (and ``duration_s``) when ``new`` moves a run from non-terminal to terminal.
 
     Every terminal transition (finalize, halt, cancel, reaper timeout/sweep, entry-submit
     failure) goes through :func:`update_status`, so stamping here covers all of them. Uses the
     mutator's own ``updated_at`` (same format as ``submitted_at``) when it is a valid timestamp,
-    else now. A run that was already terminal keeps its existing ``ended_at``.
+    else now. A run that was already terminal keeps its existing ``ended_at``. ``duration_s`` is
+    ``ended_at - submitted_at`` in seconds (>= 0, 3 decimals); ``current_nodes`` is cleared.
     """
-    if (new.get("status") in TERMINAL_RUN_STATUSES and old.get("status") not in TERMINAL_RUN_STATUSES
-            and not new.get("ended_at")):
-        ts = new.get("updated_at")
-        new["ended_at"] = ts if _valid_ts(ts) else _now()
+    if (new.get("status") in TERMINAL_RUN_STATUSES and old.get("status") not in TERMINAL_RUN_STATUSES):
+        if not new.get("ended_at"):
+            ts = new.get("updated_at")
+            new["ended_at"] = ts if _valid_ts(ts) else _now()
+        start, end = _parse_ts(new.get("submitted_at")), _parse_ts(new["ended_at"])
+        if start and end and new.get("duration_s") is None:
+            new["duration_s"] = round(max(0.0, (end - start).total_seconds()), 3)
+
+
+def _stamp_nodes(old, new):
+    """Per-node display times (``nodes.<id>.started_at`` / ``ended_at``) and ``current_nodes``.
+
+    ``started_at``: the node first becomes ``queued``/``running`` (connectors that go straight to
+    ``completed`` set it themselves). ``ended_at``: the node first becomes terminal (its
+    ``completed_at`` when present, else the doc's ``updated_at``); a node cancelled before it
+    started gets none. ``current_nodes`` is the ids of the nodes now queued/running, ``[]`` once
+    the run is terminal. Never touches a value a mutator already set.
+    """
+    nodes = new.get("nodes")
+    if not isinstance(nodes, dict):
+        return
+    old_nodes = old.get("nodes") if isinstance(old.get("nodes"), dict) else {}
+    ts = new.get("updated_at") if _valid_ts(new.get("updated_at")) else _now()
+    for nid, n in nodes.items():
+        if not isinstance(n, dict):
+            continue
+        before = (old_nodes.get(nid) or {}).get("state")
+        state = n.get("state")
+        if state == before:
+            continue
+        if state in STARTED_NODE_STATES and "started_at" not in n:
+            n["started_at"] = ts
+        elif (state in TERMINAL_NODE_STATES and before not in TERMINAL_NODE_STATES and "ended_at" not in n
+              and (state != "cancelled" or n.get("started_at"))):
+            n["ended_at"] = n.get("completed_at") if _valid_ts(n.get("completed_at")) else ts
+    if new.get("status") in TERMINAL_RUN_STATUSES:
+        new["current_nodes"] = []
+    else:
+        new["current_nodes"] = [nid for nid, n in nodes.items()
+                                if isinstance(n, dict) and n.get("state") in STARTED_NODE_STATES]
+
+
+def set_failure(doc, failed_node, error_class):
+    """Record what stopped the run: ``failed_node`` (spec node id, omitted when None) and ``error_class``
+    (see the ``ERROR_CLASS_*`` values). Mutates and returns ``doc``."""
+    if failed_node:
+        doc["failed_node"] = failed_node
+    doc["error_class"] = error_class or ERROR_CLASS_UNKNOWN
+    return doc
 
 
 def _raw(client):
@@ -129,6 +193,7 @@ def update_status(client, index, run_id, mutate, max_attempts=8, base_delay=0.01
         if new is None:
             return doc
         _stamp_ended_at(doc, new)
+        _stamp_nodes(doc, new)
         r = es.index(index=index, id=run_id, body=new, if_seq_no=seq_no,
                      if_primary_term=primary_term, ignore=409)
         if not _is_error(r, 409):

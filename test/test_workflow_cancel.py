@@ -88,3 +88,22 @@ def test_submit_revokes_batches_and_params():
 def test_sweep_run_none():
     calls = []
     assert wc.sweep_run(_ES([[]]), "js", "r", lambda **kw: calls.append(kw), "t") == 0 and not calls
+
+
+def test_cancel_mutate_sets_cancelled_error_class_without_failed_node():
+    d = wc.cancel_mutate("bob")(_doc())
+    assert d["error_class"] == "cancelled" and "failed_node" not in d
+
+
+def test_cancel_mutate_timeout_sets_error_class_and_running_node():
+    d = wc.cancel_mutate("reaper", "failed", "run timed out after 48h")(_doc())
+    assert d["error_class"] == "timeout" and d["failed_node"] == "B"
+    doc = _doc()
+    doc["nodes"]["B"]["state"] = "pending"  # nothing running: class only
+    d = wc.cancel_mutate("reaper", "failed", "t")(doc)
+    assert d["error_class"] == "timeout" and "failed_node" not in d
+
+
+def test_cancel_mutate_terminal_run_untouched():
+    doc = _doc("completed")
+    assert wc.cancel_mutate("bob")(doc) is None and "error_class" not in doc
