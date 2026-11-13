@@ -24,6 +24,7 @@ every write would only add cost. Searches over ``workflow_status`` are eventuall
 import copy
 import random
 import time
+from datetime import datetime, timezone
 
 __all__ = [
     "WorkflowStatusError",
@@ -50,6 +51,37 @@ class WorkflowStatusNotFound(WorkflowStatusError):
 
 class WorkflowStatusConflict(WorkflowStatusError):
     """update_status: version conflicts persisted through every attempt."""
+
+
+TERMINAL_RUN_STATUSES = frozenset({"completed", "failed", "cancelled"})
+
+
+def _now():
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+
+
+def _valid_ts(ts):
+    if not isinstance(ts, str):
+        return False
+    try:
+        datetime.fromisoformat(ts.replace("Z", "+00:00"))
+        return True
+    except ValueError:
+        return False
+
+
+def _stamp_ended_at(old, new):
+    """Set ``ended_at`` when ``new`` moves a run from non-terminal to terminal.
+
+    Every terminal transition (finalize, halt, cancel, reaper timeout/sweep, entry-submit
+    failure) goes through :func:`update_status`, so stamping here covers all of them. Uses the
+    mutator's own ``updated_at`` (same format as ``submitted_at``) when it is a valid timestamp,
+    else now. A run that was already terminal keeps its existing ``ended_at``.
+    """
+    if (new.get("status") in TERMINAL_RUN_STATUSES and old.get("status") not in TERMINAL_RUN_STATUSES
+            and not new.get("ended_at")):
+        ts = new.get("updated_at")
+        new["ended_at"] = ts if _valid_ts(ts) else _now()
 
 
 def _raw(client):
@@ -96,6 +128,7 @@ def update_status(client, index, run_id, mutate, max_attempts=8, base_delay=0.01
         new = mutate(copy.deepcopy(doc))
         if new is None:
             return doc
+        _stamp_ended_at(doc, new)
         r = es.index(index=index, id=run_id, body=new, if_seq_no=seq_no,
                      if_primary_term=primary_term, ignore=409)
         if not _is_error(r, 409):

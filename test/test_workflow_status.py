@@ -102,3 +102,39 @@ def test_non_conflict_error_propagates_and_wrapper_unwrapped():
         es = FakeES({"n": 0})
     update_status(Wrapper(), "i", "r", lambda d: {"n": 1})
     assert Wrapper.es.doc == {"n": 1}
+
+
+def _run(status="running", **kw):
+    return {"run_id": "r", "status": status, "updated_at": "2026-01-01T00:00:00.000Z", **kw}
+
+
+@pytest.mark.parametrize("st", ["completed", "failed", "cancelled"])
+def test_ended_at_set_on_terminal_transition(st):
+    es = FakeES(_run())
+    out = update_status(es, "i", "r", lambda d: {**d, "status": st, "updated_at": "2026-01-02T03:04:05.678Z"})
+    assert out["ended_at"] == "2026-01-02T03:04:05.678Z" == es.doc["ended_at"]
+
+
+def test_ended_at_not_set_for_non_terminal_write():
+    es = FakeES(_run())
+    out = update_status(es, "i", "r", lambda d: {**d, "current_nodes": ["A"]})
+    assert "ended_at" not in out
+
+
+def test_ended_at_not_overwritten_when_already_terminal():
+    es = FakeES(_run("completed", ended_at="2026-01-01T00:00:01.000Z"))
+    update_status(es, "i", "r", lambda d: {**d, "error": "x", "updated_at": "2026-02-02T00:00:00.000Z"})
+    assert es.doc["ended_at"] == "2026-01-01T00:00:01.000Z"
+    es = FakeES(_run("failed"))  # terminal without ended_at (legacy doc): not invented later
+    update_status(es, "i", "r", lambda d: {**d, "error": "x"})
+    assert "ended_at" not in es.doc
+
+
+def test_ended_at_keeps_mutator_value_and_falls_back_to_now():
+    es = FakeES(_run())
+    update_status(es, "i", "r", lambda d: {**d, "status": "failed", "ended_at": "E"})
+    assert es.doc["ended_at"] == "E"
+    es = FakeES(_run(updated_at="T"))  # unparseable updated_at -> current time, ms precision, Z
+    update_status(es, "i", "r", lambda d: {**d, "status": "completed"})
+    import re
+    assert re.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z", es.doc["ended_at"])
