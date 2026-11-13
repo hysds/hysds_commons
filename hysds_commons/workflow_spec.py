@@ -15,6 +15,11 @@ SCHEMA_VERSION = "1.0"
 NODE_ID_RE = re.compile(r"^[A-Za-z0-9_-]+$")
 NAME_RE = NODE_ID_RE  # input / output / param names
 
+# Optional ``tag`` on job nodes: the Figaro tag of the job(s) the node submits (see ``job_tag``).
+# Scatter children are job nodes, so a child node's ``tag`` is applied to every child job.
+# Pass/scatter/gather connector nodes take no tag; their jobs are tagged with the node id.
+TAG_RE = re.compile(r"^[A-Za-z0-9_.:-]{1,128}$")
+
 SUPPORTED_KINDS = ("job", "pass", "scatter", "gather")
 UNSUPPORTED_KINDS = ("gate", "switch", "halt")
 # node ids that may not be authored: ref namespaces and internal connectors
@@ -31,7 +36,7 @@ NODE_DOC_FIELDS = {"label", "description"}
 CONNECTOR_FIELDS = {"connector", "connector_queue"}
 PLUGGABLE_KINDS = ("pass", "scatter", "gather")
 NODE_FIELDS = {
-    "job": {"kind", "run", "in", "out", "next"} | JOB_OPTIONAL | NODE_DOC_FIELDS,
+    "job": {"kind", "run", "in", "out", "next", "tag"} | JOB_OPTIONAL | NODE_DOC_FIELDS,
     "pass": {"kind", "bind", "next"} | NODE_DOC_FIELDS | CONNECTOR_FIELDS,
     "scatter": {"kind", "child", "over", "completion", "next"} | NODE_DOC_FIELDS | CONNECTOR_FIELDS,
     "gather": {"kind", "collect", "next"} | NODE_DOC_FIELDS | CONNECTOR_FIELDS,
@@ -168,6 +173,12 @@ def _gather_outputs(node):
 
 
 GATHER_COUNT_OUTPUTS = ("n_completed", "n_failed")  # written by the gather connector; referenceable as $.G.n_completed
+
+
+def job_tag(node, node_id):
+    """The tag of the job(s) submitted for a node: the job node's ``tag`` if set, else the node
+    id (the step name). Connector nodes have no ``tag`` so they always get their node id."""
+    return (node or {}).get("tag") or node_id
 
 
 def resolve_node_queue(spec, node, recommended_queue):
@@ -335,6 +346,8 @@ def _validate_kind_fields(nid, node, kind, where, errors):
             errors.append("%s: 'out' is required and must be a list of names matching %s" % (where, NAME_RE.pattern))
         elif len(set(out)) != len(out):
             errors.append("%s: 'out' has duplicate names" % where)
+        if "tag" in node and not (isinstance(node["tag"], str) and TAG_RE.match(node["tag"])):
+            errors.append("%s: 'tag' must be a string matching %s" % (where, TAG_RE.pattern))
         _validate_optional_job_fields({k: v for k, v in node.items() if k != "timeout_hours"}, where, errors)
     elif kind == "pass":
         b = node.get("bind")

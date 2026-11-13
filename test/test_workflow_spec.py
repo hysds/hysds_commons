@@ -131,6 +131,12 @@ CASES = [
     ("input-default-bool-as-float", linear_spec, lambda s: s["inputs"].update(n={"type": "float", "default": False}), "default does not match type float"),
     ("input-default-array-elem", linear_spec, lambda s: s["inputs"].update(n={"type": "int[]", "default": [1, True]}), "element 1"),
     ("input-default-not-list", linear_spec, lambda s: s["inputs"].update(n={"type": "string[]", "default": "a"}), "expected a list"),
+    ("job-tag-empty", linear_spec, lambda s: s["nodes"]["A"].update(tag=""), "'tag' must be a string matching"),
+    ("job-tag-bad-chars", linear_spec, lambda s: s["nodes"]["A"].update(tag="has space"), "'tag' must be a string matching"),
+    ("job-tag-not-string", linear_spec, lambda s: s["nodes"]["A"].update(tag=["x"]), "'tag' must be a string matching"),
+    ("job-tag-too-long", linear_spec, lambda s: s["nodes"]["A"].update(tag="x" * 129), "'tag' must be a string matching"),
+    ("pass-tag-not-allowed", linear_spec, lambda s: s["nodes"]["pass_1"].update(tag="t"), "unknown field 'tag'"),
+    ("scatter-tag-not-allowed", scatter_gather_spec, lambda s: s["nodes"]["scatter_1"].update(tag="t"), "unknown field 'tag'"),
     ("input-bad-name", linear_spec, lambda s: s["inputs"].update({"bad name": {"type": "int"}}), "name must match"),
 ]
 
@@ -488,3 +494,21 @@ def test_is_retryable(count, mx, ec, pats, expected):
 
 def test_is_retryable_empty_policy():
     assert is_retryable({}, "worker", 0) is False
+
+
+# ---- node tag (job tag = node tag or node id)
+def test_job_tag_valid_and_resolution():
+    from hysds_commons.workflow_spec import job_tag
+    s = linear_spec()
+    s["nodes"]["A"]["tag"] = "ingest.v2:step-1_x"
+    assert validate_spec(s) == []
+    assert job_tag(s["nodes"]["A"], "A") == "ingest.v2:step-1_x"
+    assert job_tag(s["nodes"]["B"], "B") == "B"  # no tag -> node id
+    assert job_tag(s["nodes"]["pass_1"], "pass_1") == "pass_1"  # connectors: node id
+    assert job_tag(None, "_finalize") == "_finalize"
+
+
+def test_scatter_child_node_accepts_tag():
+    s = scatter_gather_spec()
+    s["nodes"]["P"]["tag"] = "child-step"
+    assert validate_spec(s) == []

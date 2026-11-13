@@ -53,7 +53,11 @@ def workflow_tag(run_id, step_id, spec_id, child_index=None, child_total=None):
 
 
 def _default_tags(workflow):
-    return ["workflow", f"wf_run:{workflow['run_id']}"]
+    """Job tags when the caller gives none: the step id (the node id; ``_finalize`` / ``_halt``
+    for the internal connectors). Callers pass ``tags=[job_tag(node, id)]`` to apply a spec node's
+    ``tag``. Nothing else is imposed: runs are found by the ``workflow.*`` fields, and run-level
+    tags live on the run doc only."""
+    return [workflow["step_id"]]
 
 
 def submit_workflow_job(job_type, queue, params, workflow, priority=5, tags=None,
@@ -63,7 +67,7 @@ def submit_workflow_job(job_type, queue, params, workflow, priority=5, tags=None
     payload id (the job_status doc _id).
 
     ``mozart_rest_url`` is the API base, e.g. ``http://mozart:8888/api/v0.1``. It
-    defaults to ``$MOZART_REST_URL``. ``workflow=None`` submits an untagged job (the retry job,
+    defaults to ``$MOZART_REST_URL``. ``workflow=None`` submits an untagged job with no tags (the retry job,
     which must not emit workflow events itself) and ``enable_dedup=False`` skips dedup. Raises :class:`WorkflowSubmitError` on a
     transport error or ``success: false``.
     """

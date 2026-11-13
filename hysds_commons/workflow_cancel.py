@@ -144,7 +144,7 @@ def submit_revokes(submit, job_type, payload_ids, run_id, username=None,
     for i in range(0, len(ids), batch_size):
         batch = ids[i:i + batch_size]
         submit(job_type=job_type, queue=queue, params=revoke_params(batch), workflow=None,
-               tags=["workflow-revoke", f"wf_run:{run_id}"], username=username,
+               tags=["workflow-revoke"], username=username,
                job_name=f"revoke-{run_id}")
         n += len(batch)
     return n

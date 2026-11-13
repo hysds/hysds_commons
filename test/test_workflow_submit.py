@@ -40,7 +40,7 @@ def test_posts_job_submit_form():
     assert f["type"] == "job-x:v1" and f["queue"] == "q" and f["enable_dedup"] == "true"
     assert json.loads(f["params"]) == {"a": [1]}
     assert json.loads(f["workflow"]) == WF
-    assert json.loads(f["tags"]) == ["workflow", "wf_run:run-1"]
+    assert json.loads(f["tags"]) == ["B"]
 
 
 def test_env_url(monkeypatch):
@@ -90,3 +90,20 @@ def test_retry_params_shape():
     assert ws.retry_params("jid", 3) == {"retry_job_id": "jid", "retry_count_max": 3,
                                          "job_priority_increment": 0, "workflow_retry": True}
     assert ws.RETRY_JOB_TYPE == "job-lw-mozart-retry"
+
+
+def test_default_tag_is_step_id_and_no_wf_run():
+    for step in ("A", "_finalize", "_halt"):
+        wf = ws.workflow_tag("run-1", step, "s:1")
+        s = Session(Resp(200, {"success": True, "result": "p"}))
+        ws.submit_workflow_job("t", "q", {}, wf, mozart_rest_url="http://m", session=s)
+        assert json.loads(s.calls[0][1]["data"]["tags"]) == [step]
+
+
+def test_explicit_tags_win_and_untagged_job_has_none():
+    s = Session(Resp(200, {"success": True, "result": "p"}))
+    ws.submit_workflow_job("t", "q", {}, WF, tags=["my-step"], mozart_rest_url="http://m", session=s)
+    assert json.loads(s.calls[0][1]["data"]["tags"]) == ["my-step"]
+    s = Session(Resp(200, {"success": True, "result": "p"}))
+    ws.submit_workflow_job("t", "q", {}, None, mozart_rest_url="http://m", session=s)
+    assert json.loads(s.calls[0][1]["data"]["tags"]) == []
