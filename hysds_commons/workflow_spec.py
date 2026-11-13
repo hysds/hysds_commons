@@ -24,7 +24,7 @@ INPUT_TYPES = ("string", "int", "float", "bool", "string[]", "int[]", "float[]")
 
 TOP_FIELDS = {"id", "version", "schema_version", "label", "description", "defaults", "inputs", "entry", "nodes", "outputs"}
 DEFAULT_FIELDS = {"queue", "timeout_hours", "max_retries", "retry_on"}
-JOB_OPTIONAL = {"queue", "max_retries", "retry_on", "timeout_hours"}
+JOB_OPTIONAL = {"queue", "max_retries", "retry_on", "timeout_hours"}  # timeout_hours is rejected with a specific message
 # free-text documentation fields allowed on every node kind
 NODE_DOC_FIELDS = {"label", "description"}
 # pluggable connector fields (contract §11); not allowed on job nodes
@@ -167,6 +167,14 @@ def _gather_outputs(node):
     return names
 
 
+GATHER_COUNT_OUTPUTS = ("n_completed", "n_failed")  # written by the gather connector; referenceable as $.G.n_completed
+
+
+def resolve_node_queue(spec, node, recommended_queue):
+    """Queue for a job node: node.queue, then defaults.queue, then ``recommended_queue(node['run'])`` (or None)."""
+    return node.get("queue") or (spec.get("defaults") or {}).get("queue") or recommended_queue(node["run"])
+
+
 def _declared_outputs(node):
     kind = node.get("kind")
     if kind == "job":
@@ -176,7 +184,7 @@ def _declared_outputs(node):
         b = node.get("bind")
         return {k.split(".", 1)[1] for k in b if isinstance(k, str) and "." in k} if isinstance(b, dict) else set()
     if kind == "gather":
-        return set(_gather_outputs(node))
+        return set(_gather_outputs(node)) | set(GATHER_COUNT_OUTPUTS)
     return set()
 
 
@@ -295,7 +303,11 @@ def _validate_schema(spec, errors):
         if kind not in SUPPORTED_KINDS:
             errors.append("%s: unknown or missing 'kind' %r (expected one of %s)" % (where, kind, list(SUPPORTED_KINDS)))
             continue
-        for f in sorted(set(node) - NODE_FIELDS[kind]):
+        if "timeout_hours" in node:
+            errors.append(
+                "node %s: timeout_hours is not supported per node in v1; use defaults.timeout_hours (run timeout) "
+                "or the job-spec time_limit" % nid)
+        for f in sorted(set(node) - NODE_FIELDS[kind] - {"timeout_hours"}):
             errors.append("%s: unknown field '%s' for kind '%s'" % (where, f, kind))
         if "next" in node and not (isinstance(node["next"], list) and all(isinstance(t, str) for t in node["next"])):
             errors.append("%s: 'next' must be a list of node ids" % where)
@@ -323,7 +335,7 @@ def _validate_kind_fields(nid, node, kind, where, errors):
             errors.append("%s: 'out' is required and must be a list of names matching %s" % (where, NAME_RE.pattern))
         elif len(set(out)) != len(out):
             errors.append("%s: 'out' has duplicate names" % where)
-        _validate_optional_job_fields(node, where, errors)
+        _validate_optional_job_fields({k: v for k, v in node.items() if k != "timeout_hours"}, where, errors)
     elif kind == "pass":
         b = node.get("bind")
         if not (isinstance(b, dict) and b):

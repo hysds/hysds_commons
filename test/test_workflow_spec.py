@@ -9,6 +9,7 @@ from hysds_commons.workflow_spec import (
     DEFAULT_WORKFLOW_CONNECTORS,
     check_spec,
     predecessors,
+    resolve_node_queue,
     resolve_connectors,
     spec_doc_id,
     topo_order,
@@ -187,6 +188,43 @@ def test_scatter_child_can_ref_scatter_ancestors_but_not_unrelated():
     assert validate_spec(s) == []
     s["nodes"]["P"]["in"]["y"] = "$.A.items"
     assert validate_spec(s) == []
+
+
+def test_node_timeout_hours_rejected():
+    s = linear_spec()
+    s["nodes"]["B"]["timeout_hours"] = 2
+    errs = validate_spec(s)
+    assert errs == ["node B: timeout_hours is not supported per node in v1; use defaults.timeout_hours "
+                    "(run timeout) or the job-spec time_limit"]
+
+
+def test_defaults_timeout_hours_still_valid():
+    s = linear_spec()
+    s["defaults"]["timeout_hours"] = 1.5
+    assert validate_spec(s) == []
+
+
+def test_gather_count_outputs_referenceable():
+    s = scatter_gather_spec()
+    s["outputs"] = {"n": "$.gather_1.n_completed", "f": "$.gather_1.n_failed"}
+    assert validate_spec(s) == []
+    s["outputs"] = {"n": "$.gather_1.n_bogus"}
+    assert any("n_bogus" in e for e in validate_spec(s))
+
+
+def test_gather_count_ref_resolves_as_int():
+    from hysds_commons.workflow_refs import build_context, resolve
+    ctx = build_context({"inputs": {}, "nodes": {"G": {"outputs": {"result": [1], "n_completed": 4, "n_failed": 1}}}}, {})
+    assert resolve("$.G.n_completed", ctx) == 4 and resolve("$.G.n_failed", ctx) == 1
+
+
+def test_resolve_node_queue_order():
+    spec = {"defaults": {"queue": "d"}}
+    rec = lambda jt: "rec"  # noqa: E731
+    assert resolve_node_queue(spec, {"run": "j", "queue": "n"}, rec) == "n"
+    assert resolve_node_queue(spec, {"run": "j"}, rec) == "d"
+    assert resolve_node_queue({}, {"run": "j"}, rec) == "rec"
+    assert resolve_node_queue({}, {"run": "j"}, lambda jt: None) is None
 
 
 def test_validate_does_not_mutate():
