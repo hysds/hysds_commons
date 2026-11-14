@@ -351,8 +351,10 @@ def _validate_kind_fields(nid, node, kind, where, errors):
         _validate_optional_job_fields({k: v for k, v in node.items() if k != "timeout_hours"}, where, errors)
     elif kind == "pass":
         b = node.get("bind")
-        if not (isinstance(b, dict) and b):
-            errors.append("%s: 'bind' is required and must be a non-empty object" % where)
+        if b is None:  # omitted == {}: a pure sequencing pass (declares no outputs)
+            b = {}
+        if not isinstance(b, dict):
+            errors.append("%s: 'bind' must be an object (or omitted/{} for a pure sequencing pass)" % where)
             return
         for key, ref in b.items():
             parts = key.split(".", 1) if isinstance(key, str) else []

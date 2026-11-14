@@ -512,3 +512,35 @@ def test_scatter_child_node_accepts_tag():
     s = scatter_gather_spec()
     s["nodes"]["P"]["tag"] = "child-step"
     assert validate_spec(s) == []
+
+
+@pytest.mark.parametrize("mode", ["empty", "omitted"])
+def test_pass_without_bind_is_valid_sequencing(mode):
+    s = linear_spec()
+    s["nodes"]["A"]["out"] = []
+    s["nodes"]["B"]["in"] = {k: v for k, v in s["nodes"]["B"]["in"].items() if not str(v).startswith("$.pass_1")} or {"mode": "ok"}
+    if mode == "empty":
+        s["nodes"]["pass_1"]["bind"] = {}
+    else:
+        del s["nodes"]["pass_1"]["bind"]
+    assert validate_spec(s) == []
+    check_spec(s)
+
+
+@pytest.mark.parametrize("mode", ["empty", "omitted"])
+def test_pass_empty_bind_declares_no_outputs(mode):
+    s = linear_spec()
+    s["nodes"]["pass_1"]["bind"] = {}
+    if mode == "omitted":
+        del s["nodes"]["pass_1"]["bind"]
+    s["nodes"]["B"]["in"]["x"] = "$.pass_1.x"
+    assert any("not declared by node 'pass_1'" in e for e in validate_spec(s))
+
+
+def test_pass_bind_must_be_object_and_job_to_job_still_rejected():
+    s = linear_spec()
+    s["nodes"]["pass_1"]["bind"] = ["B.x"]
+    assert any("'bind' must be an object" in e for e in validate_spec(s))
+    s = linear_spec()
+    s["nodes"]["A"]["next"] = ["B"]
+    assert validate_spec(s)

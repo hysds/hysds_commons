@@ -157,3 +157,8 @@ def test_event_converted_dict_with_output_named_outputs_is_not_misread():
     ev = {"step_id": "pass_1", "workflow_outputs": {"outputs": ["a", "b"]}}
     ctx = build_context({"inputs": {}, "nodes": {}}, ev)
     assert ctx["nodes"]["pass_1"] == {"outputs": ["a", "b"]}
+
+
+def test_resolve_binds_empty_or_missing():
+    assert resolve_binds({"kind": "pass", "bind": {}}, CTX) == {}
+    assert resolve_binds({"kind": "pass"}, CTX) == {}
