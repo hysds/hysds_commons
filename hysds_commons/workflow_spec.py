@@ -14,6 +14,7 @@ Pure module: no OpenSearch, no celery, no I/O.
 """
 
 import copy
+import json
 import re
 
 from hysds_commons.workflow_refs import WorkflowRefError, WorkflowRoutingError, is_ref, parse_ref, resolve
@@ -364,8 +365,8 @@ def evaluate_switch(node, context, node_id=None):
     return ``(label, target)``.
 
     switch/cases: first matching case wins, else ``("default", default_target)``. switch/on: the
-    resolved value is mapped with ``str()`` (``True`` -> ``"True"``, ``1.0`` -> ``"1.0"``) and looked
-    up in ``choices``; a miss gives ``("default", ...)``. gate: ``("true"|"false", target)``.
+    resolved value is mapped to its JSON text (``true`` -> ``"true"``, ``1`` -> ``"1"``, ``1.0`` ->
+    ``"1.0"``; strings as-is) and looked up in ``choices``; a miss gives ``("default", ...)``. gate: ``("true"|"false", target)``.
     Raises ``WorkflowRefError`` for a missing/null ref, ``WorkflowRoutingError`` for a type/operator
     error. ``node_id`` only qualifies error messages."""
     where = "node '%s'" % node_id if node_id else "switch"
@@ -383,7 +384,7 @@ def evaluate_switch(node, context, node_id=None):
                 return label, arms[label]
         return DEFAULT_LABEL, arms[DEFAULT_LABEL]
     val = _operand(node.get("on"), context)
-    label = val if isinstance(val, str) else str(val)
+    label = val if isinstance(val, str) else json.dumps(val, sort_keys=True)
     if label != DEFAULT_LABEL and label in (node.get("choices") or {}) and label in arms:
         return label, arms[label]
     return DEFAULT_LABEL, arms[DEFAULT_LABEL]

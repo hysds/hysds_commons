@@ -628,8 +628,8 @@ def test_gate_evaluation():
 
 
 def test_on_choices_str_coercion_and_miss():
-    node = {"kind": "switch", "on": "$.A.v", "choices": {"1": ["one"], "1.5": ["f"], "True": ["t"], "x": ["ex"]}, "default": ["D"]}
-    for v, exp in [(1, ("1", "one")), (1.5, ("1.5", "f")), (True, ("True", "t")), ("x", ("x", "ex")),
+    node = {"kind": "switch", "on": "$.A.v", "choices": {"1": ["one"], "1.5": ["f"], "true": ["t"], "x": ["ex"]}, "default": ["D"]}
+    for v, exp in [(1, ("1", "one")), (1.5, ("1.5", "f")), (True, ("true", "t")), ("x", ("x", "ex")),
                    ("nope", ("default", "D")), (2, ("default", "D")), (False, ("default", "D")), ([1], ("default", "D"))]:
         assert evaluate_switch(node, ctx(A={"v": v})) == exp
     with pytest.raises(WorkflowRefError):
