@@ -17,7 +17,8 @@ import copy
 import json
 import re
 
-from hysds_commons.workflow_refs import WorkflowRefError, WorkflowRoutingError, is_ref, parse_ref, resolve
+from hysds_commons.workflow_refs import (
+    WorkflowRefError, WorkflowRoutingError, is_first_of, is_ref, parse_ref, resolve)
 
 SCHEMA_VERSION = "1.0"
 NODE_ID_RE = re.compile(r"^[A-Za-z0-9_-]+$")
@@ -462,6 +463,34 @@ def _declared_outputs(node):
     return set()
 
 
+def _walk_values(value, path):
+    """Yield ``(path, "ref", str)`` for every ``$``-ref string and ``(path, "first_of", dict)`` for every
+    ``{"first_of": [...]}`` object inside nested dict/list ``value`` (a first_of is not descended into)."""
+    if is_first_of(value):
+        yield path, "first_of", value
+    elif isinstance(value, str):
+        if is_ref(value):
+            yield path, "ref", value
+    elif isinstance(value, dict):
+        for k, v in value.items():
+            yield from _walk_values(v, "%s.%s" % (path, k) if path else str(k))
+    elif isinstance(value, list):
+        for i, v in enumerate(value):
+            yield from _walk_values(v, "%s[%d]" % (path, i))
+
+
+def _find_first_of(value, path):
+    """Paths of every first_of object inside ``value`` (used to reject it where it is not allowed)."""
+    if is_first_of(value):
+        yield path
+    elif isinstance(value, dict):
+        for k, v in value.items():
+            yield from _find_first_of(v, "%s.%s" % (path, k) if path else str(k))
+    elif isinstance(value, list):
+        for i, v in enumerate(value):
+            yield from _find_first_of(v, "%s[%d]" % (path, i))
+
+
 def _walk_strings(value, path):
     """Yield (path, str) for every string inside nested dict/list ``value``."""
     if isinstance(value, str):
@@ -594,8 +623,8 @@ def _validate_schema(spec, errors):
         for name, ref in outs.items():
             if not (isinstance(name, str) and NAME_RE.match(name)):
                 errors.append("spec outputs: name %r must match %s" % (name, NAME_RE.pattern))
-            if not is_ref(ref):
-                errors.append("spec outputs '%s': value must be a '$.' ref, got %r" % (name, ref))
+            if not (is_ref(ref) or is_first_of(ref)):
+                errors.append("spec outputs '%s': value must be a '$.' ref or a first_of, got %r" % (name, ref))
 
 
 def _validate_arm(value, what, where, errors):
@@ -704,7 +733,14 @@ def _validate_route_fields(nid, node, kind, where, errors):
         errors.append("%s: duplicate arm names %s" % (where, dups))
 
 
+FIRST_OF_WHERE = "only allowed in a job's 'in', a pass 'bind' value and spec outputs"
+
+
 def _validate_kind_fields(nid, node, kind, where, errors):
+    scan = {"switch": node, "gate": node.get("when"), "scatter": node.get("over"), "gather": node.get("collect")}
+    if kind in scan:
+        for path in _find_first_of(scan[kind], {"switch": "", "gate": "when", "scatter": "over", "gather": "collect"}[kind]):
+            errors.append("%s: first_of is %s (found at '%s')" % (where, FIRST_OF_WHERE, path))
     if kind in ARM_KINDS or kind == "halt":
         _validate_route_fields(nid, node, kind, where, errors)
     if kind == "job":
@@ -731,8 +767,8 @@ def _validate_kind_fields(nid, node, kind, where, errors):
             parts = key.split(".", 1) if isinstance(key, str) else []
             if len(parts) != 2 or not parts[0] or not NAME_RE.match(parts[1]):
                 errors.append("%s: bind key %r must be '<next_node>.<param>'" % (where, key))
-            if not is_ref(ref):
-                errors.append("%s: bind '%s' value must be a '$.' ref, got %r" % (where, key, ref))
+            if not (is_ref(ref) or is_first_of(ref)):
+                errors.append("%s: bind '%s' value must be a '$.' ref or a first_of, got %r" % (where, key, ref))
     elif kind == "scatter":
         if not (isinstance(node.get("child"), str) and node["child"]):
             errors.append("%s: 'child' is required and must be a node id" % where)
@@ -952,6 +988,89 @@ def _check_ref(spec, ref, where, owner, errors, dominated_by=None, child_ids=fro
             errors.append("%s: %s refers to output '%s' not declared by node '%s'" % (where, ref, output, node))
 
 
+def _check_first_of(spec, fo, where, owner, errors, strict_doms, some_anc, child_ids, doms):
+    """D5: validate ``{"first_of": [...]}`` at ``where`` ("node 'N' field 'in.x'" / "spec outputs field 'o'").
+
+    Entries: 2+ ``$.node.output`` / ``$.inputs.name`` refs (no literals, no nesting). Owner nodes: each listed
+    node is an ancestor of the owner (on some path) declaring the output; an always-resolving entry
+    (``$.inputs.*`` or a strict dominator) must be last; and the listed nodes must cover every path from
+    the entry to the owner (unless an ``$.inputs`` entry is present). Spec outputs (owner None): the
+    nodes only need to exist and declare the output; only ``$.inputs`` entries must be last."""
+    nodes = _nodes(spec)
+    entries = fo.get("first_of")
+    if len(fo) != 1:
+        errors.append("%s: first_of must be an object with the single key 'first_of', has %s" % (where, sorted(fo)))
+        return
+    if not isinstance(entries, list) or len(entries) < 2:
+        errors.append("%s: first_of must be a list of at least 2 refs, got %r" % (where, entries))
+        return
+    parsed, ok = [], True
+    for e in entries:
+        if not is_ref(e):
+            errors.append("%s: first_of entry %r must be a '$.' ref (literals and nesting are not allowed)" % (where, e))
+            ok = False
+            continue
+        try:
+            p = parse_ref(e)
+        except WorkflowRefError as ex:
+            errors.append("%s: first_of: %s" % (where, ex))
+            ok = False
+            continue
+        if p[0] == "scatter_item":
+            errors.append("%s: first_of entry %s: '$.scatter.item' is not allowed in first_of" % (where, e))
+            ok = False
+        elif p[0] == "inputs":
+            inputs = spec.get("inputs") if isinstance(spec.get("inputs"), dict) else {}
+            if p[1] not in inputs:
+                errors.append("%s: first_of entry %s refers to undeclared input '%s'" % (where, e, p[1]))
+                ok = False
+        else:
+            node, output = p[1], p[2]
+            if node not in nodes:
+                errors.append("%s: first_of entry %s refers to unknown node '%s'" % (where, e, node))
+                ok = False
+            elif owner is None and node in child_ids:
+                errors.append("%s: first_of entry %s refers to scatter child '%s', whose outputs are not stored" % (where, e, node))
+                ok = False
+            elif owner is not None and (node == owner or node not in some_anc):
+                errors.append("%s: first_of entry %s refers to '%s', which is not an ancestor of '%s'" % (where, e, node, owner))
+                ok = False
+            elif output not in _declared_outputs(nodes[node]):
+                errors.append("%s: first_of entry %s refers to output '%s' not declared by node '%s'" % (where, e, output, node))
+                ok = False
+        parsed.append((e, p))
+    if not ok:
+        return
+    for i, (e, p) in enumerate(parsed[:-1]):
+        if p[0] == "inputs":
+            why = "is a workflow input"
+        elif owner is not None and p[1] in strict_doms:
+            why = "it is on every path to '%s'" % owner
+        else:
+            continue
+        errors.append("%s: first_of entry %s can never be used; %s before it always resolves (%s)"
+                      % (where, parsed[i + 1][0], e, why))
+        return
+    if owner is None or any(p[0] == "inputs" for _, p in parsed) or owner not in doms:
+        return
+    listed = {p[1] for _, p in parsed}
+    entry = spec.get("entry")
+    succ = {}
+    for a, b in _edges(spec):
+        succ.setdefault(a, []).append(b)
+    seen, stack = set(), [entry] if entry not in listed else []
+    while stack:
+        n = stack.pop()
+        if n in seen:
+            continue
+        seen.add(n)
+        stack.extend(d for d in succ.get(n, []) if d not in listed)
+    if owner in seen:
+        unc = sorted(pr for pr in predecessors(spec).get(owner, []) if pr in seen)
+        errors.append("%s: first_of does not cover every path to '%s'; add a ref on the path through %s"
+                      % (where, owner, unc))
+
+
 def _validate_refs(spec, errors):
     """Rules 7-8."""
     nodes = _nodes(spec)
@@ -965,14 +1084,19 @@ def _validate_refs(spec, errors):
         def chk(ref, field):
             _check_ref(spec, ref, "%s field '%s'" % (base, field), nid, errors, anc, child_ids)
 
+        def chk_fo(fo, field):
+            _check_first_of(spec, fo, "%s field '%s'" % (base, field), nid, errors, anc,
+                            ancestors(spec, nid), child_ids, doms)
+
         if kind == "job" and isinstance(node.get("in"), dict):
-            for path, s in _walk_strings(node["in"], "in"):
-                if is_ref(s):
-                    chk(s, path)
+            for path, what, v in _walk_values(node["in"], "in"):
+                chk(v, path) if what == "ref" else chk_fo(v, path)
         elif kind == "pass" and isinstance(node.get("bind"), dict):
             for key, ref in node["bind"].items():
                 if is_ref(ref):
                     chk(ref, "bind.%s" % key)
+                elif is_first_of(ref):
+                    chk_fo(ref, "bind.%s" % key)
         elif kind == "switch":
             for path, s_ in _walk_strings(node.get("cases"), "cases"):
                 if is_ref(s_):
@@ -1011,6 +1135,8 @@ def _validate_refs(spec, errors):
         for name, ref in outs.items():
             if is_ref(ref):
                 _check_ref(spec, ref, "spec outputs field '%s'" % name, None, errors, None, child_ids)
+            elif is_first_of(ref):
+                _check_first_of(spec, ref, "spec outputs field '%s'" % name, None, errors, set(), set(), child_ids, doms)
 
 
 def resolve_connectors(spec, config):

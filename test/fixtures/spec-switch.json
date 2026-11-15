@@ -30,7 +30,7 @@
                          "out": ["product"], "next": ["pass_pub"] },
     "pass_pub": { "kind": "pass", "bind": { "publish.reprocessed": "$.reprocess_L2SMP.product" }, "next": ["publish"] },
     "publish": { "kind": "job", "run": "job-wf_test:v1.0",
-                 "in": { "mode": "ok", "outputs": "$.inputs.publish_outputs", "route": "$.qa_route.arm", "product": "$.L2SMP.product" },
+                 "in": { "mode": "ok", "outputs": "$.inputs.publish_outputs", "route": "$.qa_route.arm", "granule": { "first_of": ["$.reprocess_L2SMP.product", "$.L2SMP.product"] } },
                  "out": ["published"], "next": ["qa_gate"] },
     "qa_gate": { "kind": "gate",
                  "when": { "left": "$.L2SMP.qa_score", "op": "ge", "right": "$.inputs.qa_min" },

@@ -8,6 +8,12 @@ A ref is a string starting with ``$.``; three forms exist::
 
 Any other string is a literal. Refs may sit anywhere inside nested dicts/lists.
 
+first_of (D5): ``{"first_of": ["$.a.x", "$.b.y", ..., "$.inputs.z"]}`` is a value (allowed in a job's
+``in``, a pass ``bind`` value and spec ``outputs``) that resolves to the first entry whose node is
+``completed`` (``context["completed"]``); ``$.inputs.*`` entries always resolve. Skipped/pending/other
+nodes fall through. A completed node whose output is missing or null is an error (no fall-through).
+If nothing resolves: ``WorkflowRefError``, or ``None`` with ``allow_skipped=True`` (spec outputs).
+
 Skipped nodes (routing): ``build_context`` records nodes whose status state is ``skipped`` under
 ``context["skipped"]``; ``resolve(value, context, allow_skipped=True)`` then resolves a ref to such a
 node as ``None``. Only the finalize path (spec ``outputs``) passes ``allow_skipped=True``; node
@@ -102,7 +108,8 @@ def build_context(status_doc, event=None):
 
     ``{"inputs": {...}, "nodes": {node: {output: value}}}``. Only nodes whose status
     entry has an ``outputs`` dict appear. The event's ``workflow_outputs`` overlay (win over)
-    the status outputs for ``event["step_id"]``.
+    the status outputs for ``event["step_id"]``. ``context["completed"]`` (when non-empty) holds the ids of
+    ``completed`` nodes plus the event's node (for ``first_of``).
 
     Skipped nodes (``state == "skipped"``, written by a switch for untaken arms): when at least
     one exists the context gains ``"skipped": {node_id, ...}`` (key absent otherwise, so the
@@ -111,12 +118,14 @@ def build_context(status_doc, event=None):
     used for spec ``outputs`` at finalize, turns such a ref into ``None``.
     """
     status_doc = status_doc or {}
-    nodes, skipped = {}, set()
+    nodes, skipped, completed = {}, set(), set()
     for nid, n in (status_doc.get("nodes") or {}).items():
         if isinstance(n, dict) and isinstance(n.get("outputs"), dict):
             nodes[nid] = copy.deepcopy(n["outputs"])
         if isinstance(n, dict) and n.get("state") == "skipped":
             skipped.add(nid)
+        if isinstance(n, dict) and n.get("state") == "completed":
+            completed.add(nid)
     if event:
         step = event.get("step_id")
         ev_out = _event_outputs(event)
@@ -124,9 +133,13 @@ def build_context(status_doc, event=None):
             merged = nodes.get(step, {})
             merged.update(ev_out)
             nodes[step] = merged
+        if step and event.get("status") in (None, "job-completed", "completed"):
+            completed.add(step)  # the event's node has just completed (status doc may lag behind)
     ctx = {"inputs": copy.deepcopy(status_doc.get("inputs") or {}), "nodes": nodes}
     if skipped:
         ctx["skipped"] = skipped
+    if completed:
+        ctx["completed"] = completed
     return ctx
 
 
@@ -154,6 +167,38 @@ def _lookup(ref, context, scatter_item, allow_skipped=False):
     return nodes[node][output]
 
 
+def is_first_of(v):
+    """True for a dict with a ``first_of`` key (a well-formed one is ``{"first_of": [ref, ref, ...]}``)."""
+    return isinstance(v, dict) and "first_of" in v
+
+
+def _resolve_first_of(value, context, allow_skipped):
+    entries = value.get("first_of")
+    if len(value) != 1 or not isinstance(entries, list) or not entries:
+        raise WorkflowRefError("malformed first_of %r: expected {\"first_of\": [ref, ...]}" % (value,))
+    completed = context.get("completed")
+    nodes = context.get("nodes") or {}
+    for ref in entries:
+        parsed = parse_ref(ref)  # raises WorkflowRefError for a literal / malformed entry
+        if parsed[0] == "inputs":
+            return copy.deepcopy(_lookup(ref, context, _MISSING))
+        if parsed[0] != "node":
+            raise WorkflowRefError("first_of entry %r must be '$.<node>.<output>' or '$.inputs.<name>'" % (ref,))
+        node, output = parsed[1], parsed[2]
+        done = (node in completed) if completed is not None else (node in nodes)
+        if not done:
+            continue  # skipped / pending / running: fall through
+        out = (nodes.get(node) or {}).get(output)
+        if out is None:
+            raise WorkflowRefError(
+                "cannot resolve first_of entry %s: node '%s' completed but has no (or a null) output '%s'"
+                % (ref, node, output))
+        return copy.deepcopy(out)
+    if allow_skipped:
+        return None
+    raise WorkflowRefError("cannot resolve first_of %s: none of its nodes completed" % (entries,))
+
+
 def resolve(value, context, scatter_item=_MISSING, allow_skipped=False):
     """Recursively resolve refs in a literal / ref / dict / list. Returns a fresh copy.
 
@@ -161,6 +206,8 @@ def resolve(value, context, scatter_item=_MISSING, allow_skipped=False):
     ``context["skipped"]`` resolves to ``None`` instead of raising."""
     if is_ref(value):
         return copy.deepcopy(_lookup(value, context, scatter_item, allow_skipped))
+    if is_first_of(value):
+        return _resolve_first_of(value, context, allow_skipped)
     if isinstance(value, dict):
         return {k: resolve(v, context, scatter_item, allow_skipped) for k, v in value.items()}
     if isinstance(value, list):
