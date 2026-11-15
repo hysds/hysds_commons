@@ -54,7 +54,9 @@ class WorkflowStatusConflict(WorkflowStatusError):
 
 
 TERMINAL_RUN_STATUSES = frozenset({"completed", "failed", "cancelled"})
-TERMINAL_NODE_STATES = frozenset({"completed", "failed", "cancelled"})
+# "skipped": a node on a switch/gate arm that was not taken. Terminal, never "current", and it has
+# no started_at/ended_at (it never ran).
+TERMINAL_NODE_STATES = frozenset({"completed", "failed", "cancelled", "skipped"})
 STARTED_NODE_STATES = frozenset({"queued", "running"})
 
 # Run-level ``error_class`` (top-level, with ``failed_node``): a stable keyword saying what stopped the run.
@@ -67,6 +69,8 @@ ERROR_CLASS_INPUT_RESOLUTION = "input_resolution"    # a node's $ref inputs/bind
 ERROR_CLASS_OUTPUT_RESOLUTION = "output_resolution"  # the spec outputs could not be resolved at finalize
 ERROR_CLASS_SUBMIT = "submit"            # mozart could not submit the entry job
 ERROR_CLASS_NO_QUEUE = "no_queue"        # no queue for a node
+ERROR_CLASS_HALTED = "halted"            # a user halt node (status failed) ended the run
+ERROR_CLASS_ROUTING = "routing"          # a switch/gate could not evaluate (type/operator error)
 ERROR_CLASS_UNKNOWN = "unknown"          # a failed event that carried no error_class
 
 
@@ -112,7 +116,7 @@ def _stamp_nodes(old, new):
     ``started_at``: the node first becomes ``queued``/``running`` (connectors that go straight to
     ``completed`` set it themselves). ``ended_at``: the node first becomes terminal (its
     ``completed_at`` when present, else the doc's ``updated_at``); a node cancelled before it
-    started gets none. ``current_nodes`` is the ids of the nodes now queued/running, ``[]`` once
+    started gets none, and a ``skipped`` node never gets one. ``current_nodes`` is the ids of the nodes now queued/running, ``[]`` once
     the run is terminal. Never touches a value a mutator already set.
     """
     nodes = new.get("nodes")
@@ -130,7 +134,7 @@ def _stamp_nodes(old, new):
         if state in STARTED_NODE_STATES and "started_at" not in n:
             n["started_at"] = ts
         elif (state in TERMINAL_NODE_STATES and before not in TERMINAL_NODE_STATES and "ended_at" not in n
-              and (state != "cancelled" or n.get("started_at"))):
+              and state != "skipped" and (state != "cancelled" or n.get("started_at"))):
             n["ended_at"] = n.get("completed_at") if _valid_ts(n.get("completed_at")) else ts
     if new.get("status") in TERMINAL_RUN_STATUSES:
         new["current_nodes"] = []

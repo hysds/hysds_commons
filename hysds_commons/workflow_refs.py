@@ -8,6 +8,11 @@ A ref is a string starting with ``$.``; three forms exist::
 
 Any other string is a literal. Refs may sit anywhere inside nested dicts/lists.
 
+Skipped nodes (routing): ``build_context`` records nodes whose status state is ``skipped`` under
+``context["skipped"]``; ``resolve(value, context, allow_skipped=True)`` then resolves a ref to such a
+node as ``None``. Only the finalize path (spec ``outputs``) passes ``allow_skipped=True``; node
+inputs/binds keep the strict behaviour.
+
 This module is deliberately pure: no OpenSearch, no celery, no I/O.
 """
 
@@ -23,6 +28,14 @@ _VALUE_SLOTS = ("value_s", "value_d", "value_b")
 
 class WorkflowRefError(Exception):
     """Raised for a malformed ref, a malformed outputs list, or an unresolvable ref."""
+
+
+class WorkflowRoutingError(Exception):
+    """A switch/gate could not be routed: a type/operator error while evaluating a ``when`` tree
+    (e.g. ``lt`` over a string and a number), a malformed switch node, or an inconsistent
+    ``nodes_to_skip`` request. Lives here, next to :class:`WorkflowRefError`, so consumers get
+    both routing failure types from one import. A missing/null ref is a ``WorkflowRefError``
+    (run error_class ``input_resolution``); this one maps to error_class ``routing``."""
 
 
 def is_ref(v):
@@ -90,12 +103,20 @@ def build_context(status_doc, event=None):
     ``{"inputs": {...}, "nodes": {node: {output: value}}}``. Only nodes whose status
     entry has an ``outputs`` dict appear. The event's ``workflow_outputs`` overlay (win over)
     the status outputs for ``event["step_id"]``.
+
+    Skipped nodes (``state == "skipped"``, written by a switch for untaken arms): when at least
+    one exists the context gains ``"skipped": {node_id, ...}`` (key absent otherwise, so the
+    shape is unchanged for runs without routing). Node-input resolution is unaffected (a ref to a
+    skipped node still raises "has no outputs yet"); only ``resolve(..., allow_skipped=True)``,
+    used for spec ``outputs`` at finalize, turns such a ref into ``None``.
     """
     status_doc = status_doc or {}
-    nodes = {}
+    nodes, skipped = {}, set()
     for nid, n in (status_doc.get("nodes") or {}).items():
         if isinstance(n, dict) and isinstance(n.get("outputs"), dict):
             nodes[nid] = copy.deepcopy(n["outputs"])
+        if isinstance(n, dict) and n.get("state") == "skipped":
+            skipped.add(nid)
     if event:
         step = event.get("step_id")
         ev_out = _event_outputs(event)
@@ -103,10 +124,13 @@ def build_context(status_doc, event=None):
             merged = nodes.get(step, {})
             merged.update(ev_out)
             nodes[step] = merged
-    return {"inputs": copy.deepcopy(status_doc.get("inputs") or {}), "nodes": nodes}
+    ctx = {"inputs": copy.deepcopy(status_doc.get("inputs") or {}), "nodes": nodes}
+    if skipped:
+        ctx["skipped"] = skipped
+    return ctx
 
 
-def _lookup(ref, context, scatter_item):
+def _lookup(ref, context, scatter_item, allow_skipped=False):
     parsed = parse_ref(ref)
     if parsed[0] == "scatter_item":
         if scatter_item is _MISSING:
@@ -118,6 +142,8 @@ def _lookup(ref, context, scatter_item):
             raise WorkflowRefError("cannot resolve %s: unknown run input '%s'" % (ref, parsed[1]))
         return inputs[parsed[1]]
     _, node, output = parsed
+    if allow_skipped and node in (context.get("skipped") or ()):
+        return None
     nodes = context.get("nodes") or {}
     if node not in nodes:
         raise WorkflowRefError("cannot resolve %s: node '%s' has no outputs yet" % (ref, node))
@@ -128,14 +154,17 @@ def _lookup(ref, context, scatter_item):
     return nodes[node][output]
 
 
-def resolve(value, context, scatter_item=_MISSING):
-    """Recursively resolve refs in a literal / ref / dict / list. Returns a fresh copy."""
+def resolve(value, context, scatter_item=_MISSING, allow_skipped=False):
+    """Recursively resolve refs in a literal / ref / dict / list. Returns a fresh copy.
+
+    ``allow_skipped=True`` (spec ``outputs`` at finalize only): a ref to a node listed in
+    ``context["skipped"]`` resolves to ``None`` instead of raising."""
     if is_ref(value):
-        return copy.deepcopy(_lookup(value, context, scatter_item))
+        return copy.deepcopy(_lookup(value, context, scatter_item, allow_skipped))
     if isinstance(value, dict):
-        return {k: resolve(v, context, scatter_item) for k, v in value.items()}
+        return {k: resolve(v, context, scatter_item, allow_skipped) for k, v in value.items()}
     if isinstance(value, list):
-        return [resolve(v, context, scatter_item) for v in value]
+        return [resolve(v, context, scatter_item, allow_skipped) for v in value]
     return copy.deepcopy(value)
 
 

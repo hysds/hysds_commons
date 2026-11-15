@@ -20,6 +20,7 @@ from datetime import datetime, timezone
 from hysds_commons.workflow_status import (
     ERROR_CLASS_CANCELLED,
     ERROR_CLASS_TIMEOUT,
+    TERMINAL_NODE_STATES,
     set_failure,
 )
 
@@ -27,7 +28,6 @@ TERMINAL_JOB_STATUSES = frozenset(
     {"job-completed", "job-failed", "job-deduped", "job-offline", "job-revoked"}
 )
 TERMINAL_RUN_STATUSES = frozenset({"completed", "failed", "cancelled"})
-TERMINAL_NODE_STATES = frozenset({"completed", "failed", "cancelled"})
 
 REVOKE_JOB_TYPE_PREFIX = "job-lw-mozart-revoke"
 REVOKE_QUEUE = "system-jobs-queue"
