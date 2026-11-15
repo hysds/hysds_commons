@@ -43,9 +43,6 @@ CASES = [
     ("reserved-id-scatter", linear_spec, lambda s: s["nodes"].update({"scatter": _job()}), "reserved"),
     ("reserved-id-finalize", linear_spec, lambda s: s["nodes"].update({"_finalize": _job()}), "reserved"),
     ("unknown-kind", linear_spec, lambda s: s["nodes"]["A"].update(kind="wat"), "unknown or missing 'kind'"),
-    ("kind-gate", linear_spec, lambda s: s["nodes"]["A"].update(kind="gate"), "not supported in v1"),
-    ("kind-switch", linear_spec, lambda s: s["nodes"]["A"].update(kind="switch"), "not supported in v1"),
-    ("kind-halt", linear_spec, lambda s: s["nodes"]["B"].update(kind="halt"), "not supported in v1"),
     ("job-missing-run", linear_spec, lambda s: s["nodes"]["A"].pop("run"), "'run' is required"),
     ("job-missing-out", linear_spec, lambda s: s["nodes"]["A"].pop("out"), "'out' is required"),
     ("job-unknown-field", linear_spec, lambda s: s["nodes"]["A"].update(nxt=[]), "unknown field 'nxt'"),
@@ -108,8 +105,8 @@ CASES = [
     ("gather-collect-wrong-node", scatter_gather_spec, lambda s: s["nodes"]["gather_1"].update(collect="$.A.items"), "must refer to the scatter child"),
     ("gather-collect-undeclared", scatter_gather_spec, lambda s: s["nodes"]["gather_1"].update(collect="$.P.nope"), "not declared by node 'P'"),
     ("gather-next-job", scatter_gather_spec, lambda s: s["nodes"]["gather_1"].update(next=["B"]), "must be a pass"),
-    ("ref-non-ancestor", linear_spec, lambda s: s["nodes"]["A"]["in"].update(x="$.B.result"), "not a strict ancestor"),
-    ("ref-self", linear_spec, lambda s: s["nodes"]["A"]["in"].update(x="$.A.count"), "not a strict ancestor"),
+    ("ref-non-ancestor", linear_spec, lambda s: s["nodes"]["A"]["in"].update(x="$.B.result"), "which is not on every path to"),
+    ("ref-self", linear_spec, lambda s: s["nodes"]["A"]["in"].update(x="$.A.count"), "which is not on every path to"),
     ("ref-undeclared-output", linear_spec, lambda s: s["nodes"]["pass_1"].update(bind={"B.outputs": "$.A.nope"}), "not declared by node 'A'"),
     ("ref-unknown-node", linear_spec, lambda s: s["nodes"]["B"]["in"].update(x="$.ghost.out"), "unknown node 'ghost'"),
     ("ref-undeclared-input", linear_spec, lambda s: s["nodes"]["A"]["in"].update(x="$.inputs.zzz"), "undeclared input 'zzz'"),
@@ -118,8 +115,8 @@ CASES = [
     ("scatter-item-in-plain-job", linear_spec, lambda s: s["nodes"]["A"]["in"].update(x="$.scatter.item"), "only allowed in a scatter child"),
     ("scatter-item-in-pass", scatter_gather_spec, lambda s: s["nodes"]["pass_2"].update(bind={"B.files": "$.scatter.item"}), "only allowed in a scatter child"),
     ("scatter-item-bad-form", scatter_gather_spec, lambda s: s["nodes"]["P"]["in"].update(x="$.scatter.other"), "malformed ref"),
-    ("child-refs-sibling-gather-downstream", scatter_gather_spec, lambda s: s["nodes"]["P"]["in"].update(x="$.gather_1.result"), "not a strict ancestor"),
-    ("downstream-refs-child", scatter_gather_spec, lambda s: s["nodes"]["B"]["in"].update(x="$.P.result"), "not a strict ancestor"),
+    ("child-refs-sibling-gather-downstream", scatter_gather_spec, lambda s: s["nodes"]["P"]["in"].update(x="$.gather_1.result"), "which is not on every path to"),
+    ("downstream-refs-child", scatter_gather_spec, lambda s: s["nodes"]["B"]["in"].update(x="$.P.result"), "which is not on every path to"),
     ("outputs-undeclared", linear_spec, lambda s: s.update(outputs={"final": "$.B.nope"}), "not declared by node 'B'"),
     ("outputs-unknown-node", linear_spec, lambda s: s.update(outputs={"final": "$.Q.x"}), "unknown node 'Q'"),
     ("outputs-scatter-item", scatter_gather_spec, lambda s: s.update(outputs={"f": "$.scatter.item"}), "only allowed in a scatter child"),
@@ -181,12 +178,6 @@ def test_errors_name_node_and_field():
     s["nodes"]["A"]["in"]["x"] = "$.inputs.zzz"
     (err,) = validate_spec(s)
     assert "node 'A'" in err and "in.x" in err
-
-
-def test_dedicated_gate_error_names_node():
-    s = linear_spec()
-    s["nodes"]["B"]["kind"] = "gate"
-    assert any("node 'B'" in e and "not supported in v1" in e for e in validate_spec(s))
 
 
 def test_scatter_child_can_ref_scatter_ancestors_but_not_unrelated():
@@ -337,7 +328,7 @@ def test_connector_fields_accepted_on_pluggable_kinds():
 
 
 def test_default_connectors_shape():
-    assert set(DEFAULT_WORKFLOW_CONNECTORS) == {"pass", "scatter", "gather"}
+    assert set(DEFAULT_WORKFLOW_CONNECTORS) == {"pass", "scatter", "gather", "switch"}
     assert DEFAULT_WORKFLOW_CONNECTORS["scatter"] == {
         "default": "job-workflow-scatter:v1.0.0",
         "allowed": {"job-workflow-scatter:v1.0.0": "workflow-connector-scatter"}}
