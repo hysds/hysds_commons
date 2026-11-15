@@ -25,6 +25,7 @@ CONNECTOR_JOB_TYPES = {
     "pass": "job-workflow-pass:v1.0.0",
     "scatter": "job-workflow-scatter:v1.0.0",
     "gather": "job-workflow-gather:v1.0.0",
+    "switch": "job-workflow-switch:v1.0.0",  # also serves gate
     "finalize": "job-workflow-finalize:v1.0.0",
     "halt": "job-workflow-halt:v1.0.0",
 }
