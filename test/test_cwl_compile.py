@@ -38,7 +38,7 @@ class TestRadiometer:
         raw = radiometer_bytes()
         res = compile_cwl(raw)
         src = res.spec["source"]
-        assert src["format"] == SOURCE_FORMAT == "cwl-v1.2"
+        assert src["format"] == SOURCE_FORMAT == "cwl"
         assert src["sha256"] == hashlib.sha256(raw).hexdigest()
         assert src["path_map"]["steps.deliver.in.product"] == "/steps/deliver/in/product"
         assert src["path_map"]["steps.l1a"] == "/steps/l1a"
@@ -365,11 +365,11 @@ class TestRequirements:
         wf["inputs"]["x"] = "string[]"
         assert not compile_(wf).ok
 
-    def test_tag_and_connector_not_compiled(self):
+    def test_tag_compiled(self):
         wf = base()
         wf["steps"]["a"]["hints"] = {"hysds:Tag": {"tag": "t"}}
         res = compile_(wf)
-        assert res.ok and "hint_not_compiled" in codes(res.warnings)
+        assert res.ok and res.spec["steps"]["a"]["tag"] == "t"
 
 
 # --------------------------------------------------------------------------------------- inputs / types
@@ -698,7 +698,7 @@ class TestScatter:
     def test_scatter_connector_hint_valid_only_on_scattered(self):
         wf = self.sc(hints={"hysds:ScatterConnector": {"job_type": "job-lister:v1"}})
         res = compile_(wf)
-        assert res.ok and "hint_not_compiled" in codes(res.warnings)
+        assert res.ok and res.spec["steps"]["s"]["scatter"]["connector"] == {"job_type": "job-lister:v1"}
 
     @pytest.mark.parametrize("pct,thr", [(0, 1.0), (5, 0.95), (50, 0.5), (99.5, 0.005)])
     def test_threshold(self, pct, thr):
@@ -920,6 +920,8 @@ class TestHook:
         assert not res.ok and res.spec is None
         assert res.errors[-1] == {"path": "", "code": "spec_invalid", "message": "steps.a: boom"}
 
-    def test_default_hook_accepts(self):
+    def test_default_hook_is_spec2_validator(self):
         from hysds_commons.cwl import _validate_compiled
-        assert _validate_compiled({"anything": 1}) == []
+        assert _validate_compiled({"anything": 1})  # rejected by validate_spec2
+        res = compile_cwl(radiometer_bytes())
+        assert res.ok and _validate_compiled(res.spec) == []

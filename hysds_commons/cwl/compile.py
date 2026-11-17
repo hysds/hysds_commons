@@ -12,8 +12,7 @@ from hysds_commons.cwl.loader import (
     inline_run_refs, issue, load_document, validate_with_cwltool)
 
 SCHEMA_VERSION = "2.0"
-# The task statement asks for "cwl-v1.2"; S1's schema currently enumerates ["cwl"]. Change here to match.
-SOURCE_FORMAT = "cwl-v1.2"
+SOURCE_FORMAT = "cwl"
 
 
 class CWLCompileError(Exception):
@@ -48,9 +47,9 @@ class CompileResult(object):
 # It receives the compiled 2.0 spec and returns a list of error strings (empty list == valid).
 # ====================================================================================================
 def _validate_compiled(spec):
-    """Final check of the compiled spec. TODO(merge): ``from hysds_commons.workflow_spec2 import
-    validate_spec2; return validate_spec2(spec)``. Until then there is nothing to check against."""
-    return []
+    """Final check of the compiled spec against the 2.0 schema and semantic rules."""
+    from hysds_commons.workflow_spec2 import validate_spec2
+    return validate_spec2(spec)
 
 
 # ---------------------------------------------------------------------------------------------- emit
@@ -142,12 +141,12 @@ def _emit_step(model, st, warnings):
         out["op_defaults"] = defaults
     if st["scatter"]:
         out["scatter"] = {"input": st["scatter"], "threshold": round(1 - st["tolerance"] / 100.0, 6)}
-        if P.effective(levels, "ScatterConnector"):
-            warnings.append(issue("steps.%s.hints.hysds:ScatterConnector" % sid, "hint_not_compiled",
-                                  "hysds:ScatterConnector is not part of spec 2.0 yet and was not compiled"))
-    if P.effective(levels, "Tag"):
-        warnings.append(issue("steps.%s.hints.hysds:Tag" % sid, "hint_not_compiled",
-                              "hysds:Tag is not part of spec 2.0 yet and was not compiled"))
+        sc = P.effective(levels, "ScatterConnector")
+        if sc:
+            out["scatter"]["connector"] = {k: sc[k] for k in ("job_type", "queue") if sc.get(k)}
+    tag = P.effective(levels, "Tag")
+    if tag and tag.get("tag"):
+        out["tag"] = tag["tag"]
     out["out"] = list(st["out"])
     return out
 
