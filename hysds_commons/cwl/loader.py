@@ -13,6 +13,8 @@ import io
 import json
 import logging
 import re
+import os
+import tempfile
 import threading
 
 HYSDS_NS = "https://github.com/hysds/hysds_commons/cwl/v1#"
@@ -188,7 +190,13 @@ def validate_with_cwltool(doc, uri_hint="workflow.cwl"):
             lc.construct_tool_object = default_make_tool
             lc.fetcher_constructor = _no_network_fetcher()
             try:
-                load_tool(_with_base_uri(doc, uri_hint), lc)
+                # cwltool resolves "#Type" references against a real file URI, so the (normalized,
+                # inlined) document is written to a private temp dir, never a user-supplied path.
+                with tempfile.TemporaryDirectory(prefix="hysds-cwl-") as tmp:
+                    path = os.path.join(tmp, uri_hint)
+                    with open(path, "w") as f:
+                        json.dump(doc, f)
+                    load_tool(path, lc)
             except Exception as e:  # ValidationException, WorkflowException, ...
                 err, _line = _cwl_error(e)
                 errors.append(err)
@@ -207,14 +215,6 @@ def validate_with_cwltool(doc, uri_hint="workflow.cwl"):
         seen.add(flat)
         warnings.append(issue("", "cwl_warning", flat))
     return errors, warnings
-
-
-def _with_base_uri(doc, uri_hint):
-    """A copy of ``doc`` whose ``id`` is an absolute URI, so cwltool never resolves it against the cwd."""
-    d = copy.deepcopy(doc)
-    ident = str(d.get("id") or "workflow")
-    d["id"] = "file:///hysds-cwl/%s" % uri_hint if "#" in ident or "/" in ident else "file:///hysds-cwl/%s#%s" % (uri_hint, ident)
-    return d
 
 
 def _no_network_fetcher():
