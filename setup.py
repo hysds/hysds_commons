@@ -16,6 +16,7 @@ setup(
     url=hysds_commons.__url__,
     packages=find_packages(),
     include_package_data=True,
+    package_data={"hysds_commons": ["schemas/*.json"]},
     zip_safe=False,
     python_requires='>=3.12',
     install_requires=[

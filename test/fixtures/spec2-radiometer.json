@@ -1,0 +1,309 @@
+{
+  "schema_version": "2.0",
+  "id": "radiometer-orbit-l2smp",
+  "version": "1.0.0",
+  "label": "Radiometer orbit to L2SMP",
+  "description": "L0B granules for one orbit through L1A, L1B, L1C and L2SMP, a browse image in parallel, and a QA decision before delivery.",
+  "on_error": "kill",
+  "inputs": {
+    "orbit_id": {
+      "type": "string"
+    },
+    "ancillary_version": {
+      "type": "string",
+      "default": "v7"
+    },
+    "reprocess_ancillary_version": {
+      "type": "string",
+      "default": "v7-fallback"
+    }
+  },
+  "steps": {
+    "find_l0b": {
+      "job_type": "job-radiometer-find-l0b:v1.0",
+      "queue": "radiometer-default",
+      "max_retries": 1,
+      "retry_on": [
+        "offline",
+        "worker"
+      ],
+      "deps": [],
+      "in": {
+        "orbit_id": {
+          "source": [
+            "$.inputs.orbit_id"
+          ]
+        }
+      },
+      "out": [
+        "l0b_files"
+      ]
+    },
+    "l1a": {
+      "job_type": "job-radiometer-l1a:v3.2",
+      "queue": "radiometer-large",
+      "max_retries": 2,
+      "retry_on": [
+        "exit_code:137",
+        "offline"
+      ],
+      "time_limit": 3600,
+      "deps": [
+        "find_l0b"
+      ],
+      "in": {
+        "l0b_file": {
+          "source": [
+            "$.find_l0b.l0b_files"
+          ]
+        },
+        "ancillary_version": {
+          "source": [
+            "$.inputs.ancillary_version"
+          ]
+        }
+      },
+      "scatter": {
+        "input": "l0b_file",
+        "threshold": 0.95
+      },
+      "out": [
+        "l1a_file"
+      ]
+    },
+    "l1b": {
+      "job_type": "job-radiometer-l1b:v3.2",
+      "queue": "radiometer-default",
+      "max_retries": 1,
+      "retry_on": [
+        "offline",
+        "worker"
+      ],
+      "deps": [
+        "l1a"
+      ],
+      "in": {
+        "l1a_files": {
+          "source": [
+            "$.l1a.l1a_file"
+          ],
+          "link_merge": "merge_flattened",
+          "pick": "all_non_null"
+        },
+        "orbit_id": {
+          "source": [
+            "$.inputs.orbit_id"
+          ]
+        }
+      },
+      "out": [
+        "l1b_file"
+      ]
+    },
+    "l1c": {
+      "job_type": "job-radiometer-l1c:v3.2",
+      "queue": "radiometer-default",
+      "max_retries": 1,
+      "retry_on": [
+        "offline",
+        "worker"
+      ],
+      "deps": [
+        "l1b"
+      ],
+      "in": {
+        "l1b_file": {
+          "source": [
+            "$.l1b.l1b_file"
+          ]
+        }
+      },
+      "out": [
+        "l1c_file"
+      ]
+    },
+    "make_browse": {
+      "job_type": "job-radiometer-browse:v1.0",
+      "queue": "radiometer-default",
+      "max_retries": 1,
+      "retry_on": [
+        "offline",
+        "worker"
+      ],
+      "deps": [
+        "l1c"
+      ],
+      "in": {
+        "l1c_file": {
+          "source": [
+            "$.l1c.l1c_file"
+          ]
+        }
+      },
+      "out": [
+        "browse_png"
+      ]
+    },
+    "l2smp": {
+      "job_type": "job-radiometer-l2smp:v2.0",
+      "queue": "radiometer-default",
+      "max_retries": 1,
+      "retry_on": [
+        "offline",
+        "worker"
+      ],
+      "deps": [
+        "l1c"
+      ],
+      "in": {
+        "l1c_file": {
+          "source": [
+            "$.l1c.l1c_file"
+          ]
+        },
+        "ancillary_version": {
+          "source": [
+            "$.inputs.ancillary_version"
+          ]
+        }
+      },
+      "out": [
+        "product"
+      ]
+    },
+    "qa_check": {
+      "job_type": "job-radiometer-l2smp-qa:v1.0",
+      "queue": "radiometer-default",
+      "max_retries": 1,
+      "retry_on": [
+        "offline",
+        "worker"
+      ],
+      "deps": [
+        "l2smp"
+      ],
+      "in": {
+        "product": {
+          "source": [
+            "$.l2smp.product"
+          ]
+        }
+      },
+      "out": [
+        "deliver",
+        "reprocess",
+        "reject",
+        "qa_score"
+      ]
+    },
+    "reprocess_l2smp": {
+      "job_type": "job-radiometer-l2smp:v2.0",
+      "queue": "radiometer-default",
+      "max_retries": 1,
+      "retry_on": [
+        "offline",
+        "worker"
+      ],
+      "deps": [
+        "qa_check",
+        "l1c"
+      ],
+      "when": "$.qa_check.reprocess",
+      "in": {
+        "l1c_file": {
+          "source": [
+            "$.l1c.l1c_file"
+          ]
+        },
+        "ancillary_version": {
+          "source": [
+            "$.inputs.reprocess_ancillary_version"
+          ]
+        }
+      },
+      "out": [
+        "product"
+      ]
+    },
+    "reject": {
+      "halt": {
+        "status": "failed",
+        "reason": "L2SMP failed QA"
+      },
+      "deps": [
+        "qa_check"
+      ],
+      "when": "$.qa_check.reject"
+    },
+    "deliver": {
+      "job_type": "job-radiometer-deliver:v1.1",
+      "queue": "radiometer-default",
+      "max_retries": 1,
+      "retry_on": [
+        "offline",
+        "worker"
+      ],
+      "deps": [
+        "qa_check",
+        "reprocess_l2smp",
+        "l2smp",
+        "make_browse"
+      ],
+      "when": "$.qa_check.deliver",
+      "in": {
+        "product": {
+          "source": [
+            "$.reprocess_l2smp.product",
+            "$.l2smp.product"
+          ],
+          "pick": "first_non_null"
+        },
+        "browse": {
+          "source": [
+            "$.make_browse.browse_png"
+          ]
+        },
+        "orbit_id": {
+          "source": [
+            "$.inputs.orbit_id"
+          ]
+        }
+      },
+      "out": [
+        "receipt"
+      ]
+    }
+  },
+  "outputs": {
+    "product": {
+      "type": "File?",
+      "source": [
+        "$.reprocess_l2smp.product",
+        "$.l2smp.product"
+      ],
+      "pick": "first_non_null"
+    },
+    "browse": {
+      "type": "File",
+      "source": [
+        "$.make_browse.browse_png"
+      ]
+    },
+    "receipt": {
+      "type": "string?",
+      "source": [
+        "$.deliver.receipt"
+      ]
+    }
+  },
+  "source": {
+    "format": "cwl",
+    "sha256": "819973d5fb8a08dfe057d241d8f038a2a90b36ba61ab64ff3bcf04481c1e9811",
+    "path_map": {
+      "steps.deliver.in.product": "/steps/deliver/in/product",
+      "steps.deliver.when": "/steps/deliver/when",
+      "steps.l1a.scatter": "/steps/l1a/scatter",
+      "steps.reject.halt": "/steps/reject"
+    }
+  }
+}

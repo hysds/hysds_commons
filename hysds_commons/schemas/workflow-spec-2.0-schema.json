@@ -1,0 +1,140 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/hysds/hysds_commons/schemas/workflow-spec-2.0-schema.json",
+  "title": "HySDS workflow spec, schema 2.0 (compiled, run-time form)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "id", "version", "steps", "outputs"],
+  "properties": {
+    "schema_version": {"const": "2.0"},
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$"},
+    "version": {"type": "string", "minLength": 1},
+    "label": {"type": "string"},
+    "description": {"type": "string"},
+    "on_error": {"enum": ["kill", "drain", "continue"]},
+    "inputs": {
+      "type": "object",
+      "propertyNames": {"pattern": "^[A-Za-z0-9_-]+$"},
+      "additionalProperties": {"$ref": "#/definitions/input_decl"}
+    },
+    "steps": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {"pattern": "^[A-Za-z0-9_-]+$"},
+      "additionalProperties": {"$ref": "#/definitions/step"}
+    },
+    "outputs": {
+      "type": "object",
+      "propertyNames": {"pattern": "^[A-Za-z0-9_-]+$"},
+      "additionalProperties": {"$ref": "#/definitions/output_decl"}
+    },
+    "source": {"$ref": "#/definitions/source_block"}
+  },
+  "definitions": {
+    "cwl_type": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\[\\])*\\??$"},
+    "ref": {"type": "string", "pattern": "^\\$\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$"},
+    "input_decl": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {"type": {"$ref": "#/definitions/cwl_type"}, "default": {}, "label": {"type": "string"}}
+    },
+    "link_merge": {"enum": ["merge_nested", "merge_flattened"]},
+    "pick": {"enum": ["first_non_null", "the_only_non_null", "all_non_null"]},
+    "sources": {"type": "array", "minItems": 1, "items": {"$ref": "#/definitions/ref"}},
+    "in_entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "source": {"$ref": "#/definitions/sources"},
+        "link_merge": {"$ref": "#/definitions/link_merge"},
+        "pick": {"$ref": "#/definitions/pick"},
+        "default": {}
+      },
+      "anyOf": [{"required": ["source"]}, {"required": ["default"]}]
+    },
+    "output_decl": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source"],
+      "properties": {
+        "type": {"$ref": "#/definitions/cwl_type"},
+        "source": {"$ref": "#/definitions/sources"},
+        "link_merge": {"$ref": "#/definitions/link_merge"},
+        "pick": {"$ref": "#/definitions/pick"}
+      }
+    },
+    "names": {"type": "array", "items": {"type": "string", "pattern": "^[A-Za-z0-9_-]+$"}, "uniqueItems": true},
+    "step": {
+      "type": "object",
+      "if": {"required": ["halt"]},
+      "then": {"$ref": "#/definitions/halt_step"},
+      "else": {"$ref": "#/definitions/job_step"}
+    },
+    "job_step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["job_type", "deps", "out"],
+      "properties": {
+        "job_type": {"type": "string", "minLength": 1},
+        "label": {"type": "string"},
+        "description": {"type": "string"},
+        "queue": {"type": "string", "minLength": 1},
+        "max_retries": {"type": "integer", "minimum": 0},
+        "retry_on": {
+          "type": "array",
+          "items": {"type": "string", "pattern": "^(\\*|timeout|signal|offline|worker|exit_code:(-?\\d+|\\*)|pge:([A-Za-z0-9_:.-]{1,64}|\\*))$"}
+        },
+        "time_limit": {"type": "integer", "minimum": 1},
+        "deps": {"$ref": "#/definitions/names"},
+        "when": {"$ref": "#/definitions/ref"},
+        "in": {
+          "type": "object",
+          "propertyNames": {"pattern": "^[A-Za-z0-9_-]+$"},
+          "additionalProperties": {"$ref": "#/definitions/in_entry"}
+        },
+        "op_defaults": {"type": "object"},
+        "scatter": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["input"],
+          "properties": {
+            "input": {"type": "string", "minLength": 1},
+            "threshold": {"type": "number", "exclusiveMinimum": 0, "maximum": 1}
+          }
+        },
+        "out": {"$ref": "#/definitions/names"}
+      }
+    },
+    "halt_step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["halt", "deps"],
+      "properties": {
+        "label": {"type": "string"},
+        "description": {"type": "string"},
+        "deps": {"$ref": "#/definitions/names"},
+        "when": {"$ref": "#/definitions/ref"},
+        "halt": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status"],
+          "properties": {
+            "status": {"enum": ["failed", "completed"]},
+            "reason": {"type": "string", "maxLength": 512}
+          }
+        }
+      }
+    },
+    "source_block": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["format", "sha256"],
+      "properties": {
+        "format": {"enum": ["cwl"]},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "path_map": {"type": "object", "additionalProperties": {"type": "string"}}
+      }
+    }
+  }
+}
