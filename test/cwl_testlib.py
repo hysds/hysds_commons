@@ -44,7 +44,10 @@ def lookup_for(jobs):
     def lookup(jt):
         if jt not in jobs:
             return None
-        i, o = jobs[jt]
+        v = jobs[jt]
+        if isinstance(v, dict):
+            return v
+        i, o = v
         return {"inputs": i, "outputs": o}
     return lookup
 

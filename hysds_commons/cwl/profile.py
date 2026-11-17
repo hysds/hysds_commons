@@ -385,10 +385,10 @@ def is_decide_job(job_type):
 
 
 def check_when_tree(tree, path, issues, depth=1):
-    if isinstance(tree, bool):
-        return
     if depth > WHEN_MAX_DEPTH:
         issues.error(path, "decide_cases", "condition nests deeper than %d levels" % WHEN_MAX_DEPTH)
+        return
+    if isinstance(tree, bool):
         return
     if not isinstance(tree, dict):
         issues.error(path, "decide_cases", "a condition must be a boolean or an object (op/right, all, any or not)")
