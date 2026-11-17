@@ -1197,8 +1197,16 @@ def error_class_matches(retry_on, error_class):
     return False
 
 
+# Deterministic failures: re-running the job gives the same result, so no retry_on pattern (not even ``*``) retries
+# them. ``outputs``: invalid / oversized / unresolvable workflow outputs (job_worker or the engine).
+NEVER_RETRIED_CLASSES = frozenset({"outputs"})
+
+
 def is_retryable(policy, error_class, retry_count):
-    """Contract 12.2: retryable iff ``retry_count < max_retries`` and the class matches ``retry_on``."""
+    """Contract 12.2: retryable iff ``retry_count < max_retries`` and the class matches ``retry_on``; a class in
+    :data:`NEVER_RETRIED_CLASSES` is never retryable."""
+    if error_class in NEVER_RETRIED_CLASSES:
+        return False
     count = retry_count if _is_int(retry_count) else 0
     return count < policy.get("max_retries", 0) and error_class_matches(policy.get("retry_on"), error_class)
 

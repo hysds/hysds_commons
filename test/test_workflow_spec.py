@@ -535,3 +535,9 @@ def test_pass_bind_must_be_object_and_job_to_job_still_rejected():
     s = linear_spec()
     s["nodes"]["A"]["next"] = ["B"]
     assert validate_spec(s)
+
+
+def test_outputs_class_never_retried():
+    # invalid / oversized workflow outputs are deterministic: not even "*" retries them
+    assert is_retryable({"max_retries": 3, "retry_on": ["*"]}, "outputs", 0) is False
+    assert is_retryable({"max_retries": 3, "retry_on": ["*"]}, "worker", 0) is True
