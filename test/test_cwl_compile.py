@@ -700,6 +700,36 @@ class TestScatter:
         res = compile_(wf)
         assert res.ok and res.spec["steps"]["s"]["scatter"]["connector"] == {"job_type": "job-lister:v1"}
 
+    def conn(self, jt="job-lister:v1", **hint):
+        return self.sc(hints={"hysds:ScatterConnector": dict(job_type=jt, **hint)})
+
+    def test_connector_allowlist_none_means_no_check(self):
+        assert compile_(self.conn("job-anything:v9"), allowed_connectors=None).ok
+
+    @pytest.mark.parametrize("allowed", [
+        {"scatter": {"default": "job-lister:v1", "allowed": {"job-lister:v1": "q-lister"}}},  # WORKFLOW_CONNECTORS shape
+        {"job-lister:v1": "q-lister"}, ["job-lister:v1"], ("job-lister:v1",)])
+    def test_connector_allowed(self, allowed):
+        res = compile_(self.conn(), allowed_connectors=allowed)
+        assert res.ok, res.errors
+
+    @pytest.mark.parametrize("allowed", [
+        {"scatter": {"default": "x", "allowed": {"job-other:v1": "q"}}}, ["job-other:v1"], [], {}])
+    def test_connector_not_allowed(self, allowed):
+        e = assert_error(compile_(self.conn(), allowed_connectors=allowed), "connector_not_allowed",
+                         "steps.s.hints.hysds:ScatterConnector")
+        assert "job-lister:v1" in e["message"]
+
+    def test_allowlist_queue_fills_connector_queue(self):
+        allowed = {"scatter": {"default": "job-lister:v1", "allowed": {"job-lister:v1": "q-lister"}}}
+        res = compile_(self.conn(), allowed_connectors=allowed)
+        assert res.spec["steps"]["s"]["scatter"]["connector"] == {"job_type": "job-lister:v1", "queue": "q-lister"}
+        res = compile_(self.conn(queue="mine"), allowed_connectors=allowed)  # an explicit hint queue wins
+        assert res.spec["steps"]["s"]["scatter"]["connector"]["queue"] == "mine"
+
+    def test_allowlist_ignores_unscattered_steps(self):
+        assert compile_(base(), allowed_connectors=[]).ok
+
     @pytest.mark.parametrize("pct,thr", [(0, 1.0), (5, 0.95), (50, 0.5), (99.5, 0.005)])
     def test_threshold(self, pct, thr):
         wf = self.sc(hints={"hysds:Gather": {"tolerated_failure_percentage": pct}})

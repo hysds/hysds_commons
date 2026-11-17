@@ -12,7 +12,8 @@ Run doc::
      "error_class", "reason", "failed_step", "cancelled_by",
      "steps": {step_id: {"kind": "job"|"halt", "state", "job_type", "job_id", "started_at", "ended_at",
                          "attempts": [{"attempt", "job_id", "status", "started_at", "ended_at", "error"}],
-                         "scatter": {"input", "threshold", "expected", "n_completed", "n_failed", "children"},
+                         "scatter": {"input", "threshold", "expected", "n_completed", "n_failed", "children",
+                                     "phase": null|"connector"|"children", "connector": {job_type, queue}|null},
                          "skipped_by": {"flag", "value"}, "cancelled_by": {"kind", "step", "reason"},
                          "halt": {"status", "reason", "fired"}, "error", "error_class"}},
      "job_definitions": {job_type: {"job_spec", "hysds_io", "container", "queue"}}}
@@ -54,8 +55,14 @@ def short_error(error):
 
 
 def job_types(spec):
-    """Sorted distinct job types used by the job steps of a 2.0 spec."""
-    return sorted({s["job_type"] for s in spec["steps"].values() if "job_type" in s})
+    """Sorted distinct job types used by the job steps of a 2.0 spec, plus the ``hysds:ScatterConnector``
+    job types (frozen too: a running workflow never reads job definitions from OpenSearch)."""
+    jts = {s["job_type"] for s in spec["steps"].values() if "job_type" in s}
+    for s in spec["steps"].values():
+        conn = (s.get("scatter") or {}).get("connector")
+        if conn and conn.get("job_type"):
+            jts.add(conn["job_type"])
+    return sorted(jts)
 
 
 def freeze_job_definitions(spec, fetch):
@@ -82,8 +89,10 @@ def new_run_doc(spec, run_id, inputs, job_definitions, created_at=None, spec_sha
         if halt:
             st["halt"] = {"status": s["halt"]["status"], "reason": s["halt"].get("reason"), "fired": False}
         if "scatter" in s:
+            conn = s["scatter"].get("connector")
             st["scatter"] = {"input": s["scatter"]["input"], "threshold": s["scatter"].get("threshold", 1.0),
-                             "expected": None, "n_completed": 0, "n_failed": 0, "children": []}
+                             "expected": None, "n_completed": 0, "n_failed": 0, "children": [],
+                             "phase": None, "connector": copy.deepcopy(conn) if conn else None}
         steps[sid] = st
     return {
         "schema_version": RUN_DOC_SCHEMA_VERSION, "run_id": run_id,
@@ -235,6 +244,33 @@ def mark_step_halted(doc, sid, now=None):
     return _next(doc, m)
 
 
+def mark_scatter_connector(doc, sid, job_id, now=None):
+    """The scatter connector job was submitted: like :func:`mark_step_queued`, and the scatter is in
+    phase ``connector`` (the attempts of the step are the connector's)."""
+    new = mark_step_queued(doc, sid, job_id, now=now)
+    new["steps"][sid]["scatter"]["phase"] = "connector"
+    return new
+
+
+def mark_scatter_fanout(doc, sid, expected, now=None):
+    """The item list is known (``expected`` children): the step is running, in phase ``children``. Children
+    are ordinary jobs tracked in Redis, so the step has no attempt of its own (a connector attempt, if any,
+    stays as the record of the lister job)."""
+    now = now or utcnow_iso()
+    st0 = _step(doc, sid)
+    if "scatter" not in st0:
+        raise WorkflowRunError("step %r is not a scatter step" % sid)
+
+    def m(d):
+        st = d["steps"][sid]
+        st["state"] = "running"
+        if st["started_at"] is None:
+            st["started_at"] = now
+        sc = st["scatter"]
+        sc["expected"], sc["phase"] = expected, "children"
+    return _next(doc, m)
+
+
 def update_scatter(doc, sid, expected=None, n_completed=None, n_failed=None, children=None):
     """Update a scattered step's counters / child job ids (only the given fields change)."""
     st0 = _step(doc, sid, allow_terminal=True)
@@ -372,7 +408,8 @@ def _validate_step(sid, st, defs, e):
         for k in ("started_at", "ended_at", "error"):
             if k not in a:
                 e.append("%s: missing '%s'" % (aw, k))
-    if state in ("queued", "running") and not atts:
+    fanned_out = isinstance(st.get("scatter"), dict) and st["scatter"].get("phase") == "children"
+    if state in ("queued", "running") and not atts and not fanned_out:
         e.append("%s: state %s needs at least one attempt" % (w, state))
     if state == "skipped" and not isinstance(st.get("skipped_by"), dict):
         e.append("%s.skipped_by: required for a skipped step" % w)
