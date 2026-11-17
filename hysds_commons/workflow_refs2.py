@@ -17,7 +17,6 @@ submit, is the last link). All failures raise ``WorkflowRefError`` (run error_cl
 import copy
 import re
 
-from hysds_commons.cwl.profile import _default_value as flatten_files
 from hysds_commons.workflow_refs import WorkflowRefError
 
 _WHEN_INPUT_RE = re.compile(r"^\$\(\s*inputs\.([A-Za-z_][A-Za-z0-9_-]*)\s*\)$")
@@ -34,6 +33,19 @@ _PRIMITIVES = {
     "Any": lambda v: True,
 }
 
+
+
+def flatten_files(d):
+    """A File/Directory object (also inside arrays) flattened to its location (or path); other values unchanged.
+
+    Kept here (not in ``hysds_commons.cwl``) so the runtime never needs the optional ``cwl`` extra;
+    the CWL compiler imports it from this module.
+    """
+    if isinstance(d, list):
+        return [flatten_files(x) for x in d]
+    if isinstance(d, dict) and d.get("class") in ("File", "Directory"):
+        return d.get("location") or d.get("path")
+    return d
 
 def lookup_ref(ref, settled, run_inputs):
     """Value of one ``$.inputs.x`` / ``$.step.out`` ref (deep-copied)."""

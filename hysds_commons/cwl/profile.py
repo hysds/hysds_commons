@@ -10,6 +10,7 @@ prefix text (B15). Paths are CWL paths such as ``steps.deliver.in.product.source
 import re
 
 from hysds_commons.cwl.loader import HYSDS_NS, SCHEMA_NS
+from hysds_commons.workflow_refs2 import flatten_files as _default_value
 
 DECIDE_JOB = "job-workflow-decide"
 DECIDE_OTHERWISE_DEFAULT = "otherwise"
@@ -484,15 +485,6 @@ def _check_param_decl(p, path, issues):
             if k in d:
                 issues.error("%s.default.%s" % (path, k), "file_field_unsupported",
                              "'%s' is not supported on File objects" % k)
-
-
-def _default_value(d):
-    """A File/Directory object (also inside arrays) flattened to its location (or path); other values unchanged."""
-    if isinstance(d, list):
-        return [_default_value(x) for x in d]
-    if isinstance(d, dict) and d.get("class") in ("File", "Directory"):
-        return d.get("location") or d.get("path")
-    return d
 
 
 def _analyze(doc, run_resolver, issues):
