@@ -484,6 +484,9 @@ def _check_param_decl(p, path, issues):
 
 
 def _default_value(d):
+    """A File/Directory object (also inside arrays) flattened to its location (or path); other values unchanged."""
+    if isinstance(d, list):
+        return [_default_value(x) for x in d]
     if isinstance(d, dict) and d.get("class") in ("File", "Directory"):
         return d.get("location") or d.get("path")
     return d

@@ -17,6 +17,7 @@ submit, is the last link). All failures raise ``WorkflowRefError`` (run error_cl
 import copy
 import re
 
+from hysds_commons.cwl.profile import _default_value as flatten_files
 from hysds_commons.workflow_refs import WorkflowRefError
 
 _WHEN_INPUT_RE = re.compile(r"^\$\(\s*inputs\.([A-Za-z_][A-Za-z0-9_-]*)\s*\)$")
@@ -81,16 +82,22 @@ def link_merge(values, mode):
     raise WorkflowRefError("unknown link_merge %r" % (mode,))
 
 
-def pick_value(value, mode, what="input"):
-    """CWL pickValue over a list ``value``; CWL error semantics."""
+def pick_value(value, mode, what="input", null_ok=False):
+    """CWL pickValue over a list ``value``; CWL error semantics. With ``null_ok`` (an optional run output,
+    B21) an all-null ``first_non_null`` / ``the_only_non_null`` gives ``None`` instead of an error; more
+    than one non-null value for ``the_only_non_null`` is still an error."""
     if not isinstance(value, list):
         raise WorkflowRefError("%s: pick %r needs a list, got %s" % (what, mode, type(value).__name__))
     non_null = [v for v in value if v is not None]
     if mode == "first_non_null":
+        if not non_null and null_ok:
+            return None
         if not non_null:
             raise WorkflowRefError("%s: first_non_null found only null values" % what)
         return non_null[0]
     if mode == "the_only_non_null":
+        if not non_null and null_ok:
+            return None
         if len(non_null) != 1:
             raise WorkflowRefError("%s: the_only_non_null needs exactly one non-null value, found %d" % (what, len(non_null)))
         return non_null[0]
@@ -99,15 +106,16 @@ def pick_value(value, mode, what="input"):
     raise WorkflowRefError("%s: unknown pick %r" % (what, mode))
 
 
-def resolve_entry(entry, settled, run_inputs, what="input"):
+def resolve_entry(entry, settled, run_inputs, what="input", null_ok=False):
     """Resolve one ``in`` / workflow-output entry through link_merge -> pick -> ``default``.
-    (``op_defaults`` is applied by :func:`resolve_step_inputs`.) Returns ``None`` for a null result."""
+    (``op_defaults`` is applied by :func:`resolve_step_inputs`.) Returns ``None`` for a null result.
+    ``null_ok`` is only passed for optional run outputs (see :func:`pick_value`); step inputs never set it."""
     sources = entry.get("source")
     value = None
     if sources:
         value = link_merge([lookup_ref(r, settled, run_inputs) for r in sources], entry.get("link_merge"))
         if entry.get("pick"):
-            value = pick_value(value, entry["pick"], what)
+            value = pick_value(value, entry["pick"], what, null_ok=null_ok)
     if value is None and "default" in entry:
         value = copy.deepcopy(entry["default"])
     return value
@@ -134,7 +142,8 @@ def resolve_outputs(spec, settled, run_inputs):
     output (declared type without ``?``) raises ``WorkflowRefError`` (error_class ``output_resolution``)."""
     result = {}
     for name, decl in (spec.get("outputs") or {}).items():
-        value = resolve_entry(decl, settled, run_inputs, what="output '%s'" % name)
+        value = resolve_entry(decl, settled, run_inputs, what="output '%s'" % name,
+                              null_ok=_is_optional(decl.get("type")))
         if value is None and decl.get("type") is not None and not _is_optional(decl["type"]):
             raise WorkflowRefError("output '%s' is null but its type %r is not optional" % (name, decl["type"]))
         result[name] = value
@@ -193,8 +202,23 @@ def resolve_run_inputs(spec, inputs):
         if err:
             errors.append("input '%s': %s" % (name, err))
         else:
-            resolved[name] = value
+            # §4: File / Directory objects ({class, location|path}) reach jobs as URL strings
+            flat = flatten_files(value)
+            if _has_file_object(value) and _contains_none(flat) and not _contains_none(value):
+                errors.append("input '%s': File/Directory object needs a 'location' (or 'path')" % name)
+            else:
+                resolved[name] = flat
     return resolved, errors
+
+
+def _contains_none(v):
+    return v is None or (isinstance(v, list) and any(_contains_none(x) for x in v))
+
+
+def _has_file_object(v):
+    if isinstance(v, list):
+        return any(_has_file_object(x) for x in v)
+    return isinstance(v, dict) and v.get("class") in ("File", "Directory")
 
 
 def _check_type(value, typ):

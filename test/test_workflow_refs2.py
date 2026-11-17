@@ -344,3 +344,46 @@ def test_resolve_run_inputs_errors(inputs, msg):
 def test_resolve_run_inputs_not_object():
     assert resolve_run_inputs({"inputs": {}}, [1])[1]
     assert resolve_run_inputs({"inputs": {}}, None) == ({}, [])
+
+
+# ------------------------------------------------------------------ M3 fixes
+
+
+def test_run_inputs_file_objects_flattened_to_urls():
+    spec = {"inputs": {"f": {"type": "File"}, "d": {"type": "Directory?"}, "fs": {"type": "File[]"}}}
+    res, errs = resolve_run_inputs(spec, {
+        "f": {"class": "File", "location": "s3://b/k.h5"},
+        "d": {"class": "Directory", "path": "s3://b/dir/"},
+        "fs": ["s3://b/a", {"class": "File", "location": "s3://b/b"}]})
+    assert errs == []
+    assert res == {"f": "s3://b/k.h5", "d": "s3://b/dir/", "fs": ["s3://b/a", "s3://b/b"]}
+
+
+def test_run_inputs_file_object_without_location_rejected():
+    _, errs = resolve_run_inputs({"inputs": {"f": {"type": "File"}}}, {"f": {"class": "File"}})
+    assert errs and "location" in errs[0]
+
+
+def test_resolve_outputs_all_null_pick_optional_is_null():
+    for pick in ("first_non_null", "the_only_non_null"):
+        spec = {"outputs": {"o": {"type": "File?", "source": ["$.sk.o", "$.sk.o"], "pick": pick}}}
+        assert resolve_outputs(spec, SETTLED, INPUTS) == {"o": None}
+
+
+def test_resolve_outputs_all_null_pick_required_still_fails():
+    spec = {"outputs": {"o": {"type": "File", "source": ["$.sk.o"], "pick": "first_non_null"}}}
+    with pytest.raises(WorkflowRefError):
+        resolve_outputs(spec, SETTLED, INPUTS)
+
+
+def test_the_only_non_null_two_values_still_errors_for_optional_output():
+    spec = {"outputs": {"o": {"type": "File?", "source": ["$.b.v", "$.b.v"], "pick": "the_only_non_null"}}}
+    with pytest.raises(WorkflowRefError):
+        resolve_outputs(spec, SETTLED, INPUTS)
+
+
+def test_step_input_all_null_pick_still_errors():
+    for pick in ("first_non_null", "the_only_non_null"):
+        with pytest.raises(WorkflowRefError):
+            resolve_step_inputs({"in": {"p": {"source": ["$.sk.o"], "link_merge": "merge_flattened", "pick": pick}}},
+                                SETTLED, INPUTS)
