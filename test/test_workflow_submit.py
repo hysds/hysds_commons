@@ -27,7 +27,11 @@ class Session:
         return self.resp
 
 
-WF = ws.workflow_tag("run-1", "B", "s:1")
+def wf_tag(run_id, step_id, spec_id):
+    return {"run_id": run_id, "step_id": step_id, "spec_id": spec_id, "child_index": None, "child_total": None}
+
+
+WF = wf_tag("run-1", "B", "s:1")
 
 
 def test_posts_job_submit_form():
@@ -70,7 +74,7 @@ def test_errors(resp, exc, match):
 # ------------------------------------------------------------------ slice 4.1: retry submission
 def test_untagged_submit_without_dedup_omits_workflow_field():
     s = Session(Resp(200, {"success": True, "result": "pid"}))
-    ws.submit_workflow_job("job-lw-mozart-retry:v1", ws.RETRY_QUEUE, ws.retry_params("jid", 3), None,
+    ws.submit_workflow_job("job-lw-mozart-retry:v1", "system-jobs-queue", {"retry_job_id": "jid"}, None,
                            mozart_rest_url="http://m/api/v0.1", session=s, enable_dedup=False)
     f = s.calls[0][1]["data"]
     assert "workflow" not in f
@@ -86,15 +90,9 @@ def test_tagged_submit_unchanged_dedup_on_by_default():
     assert f["enable_dedup"] == "true" and json.loads(f["workflow"]) == WF
 
 
-def test_retry_params_shape():
-    assert ws.retry_params("jid", 3) == {"retry_job_id": "jid", "retry_count_max": 3,
-                                         "job_priority_increment": 0, "workflow_retry": True}
-    assert ws.RETRY_JOB_TYPE == "job-lw-mozart-retry"
-
-
 def test_default_tag_is_step_id_and_no_wf_run():
     for step in ("A", "_finalize", "_halt"):
-        wf = ws.workflow_tag("run-1", step, "s:1")
+        wf = wf_tag("run-1", step, "s:1")
         s = Session(Resp(200, {"success": True, "result": "p"}))
         ws.submit_workflow_job("t", "q", {}, wf, mozart_rest_url="http://m", session=s)
         assert json.loads(s.calls[0][1]["data"]["tags"]) == [step]

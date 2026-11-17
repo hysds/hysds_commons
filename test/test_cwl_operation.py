@@ -125,7 +125,7 @@ class TestExtra:
 
     def test_rest_of_hysds_commons_does_not_import_cwltool(self):
         code = ("import sys, hysds_commons, hysds_commons.workflow_spec, hysds_commons.workflow_refs, "
-                "hysds_commons.workflow_examples, hysds_commons.workflow_outputs; "
+                "hysds_commons.workflow_spec2, hysds_commons.workflow_outputs; "
                 "bad = [m for m in sys.modules if m.split('.')[0] in ('cwltool', 'cwl_utils', 'schema_salad')]; "
                 "assert not bad, bad")
         import os

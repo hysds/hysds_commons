@@ -1,18 +1,7 @@
-"""Submission path for workflow-tagged jobs (v1 runtime contract §3, §5).
+"""Submission of workflow-tagged jobs through mozart's REST API (``POST <mozart>/job/submit``).
 
-Workflow jobs are submitted **through mozart's REST API** (``POST <mozart>/job/submit``),
-so they get exactly the semantics of any other HySDS job submission, plus any
-policy that endpoint enforces now or later (auth, attribution, quotas). Callers:
-
-- the workflow_rules consumer (successors and the internal _finalize/_halt connectors)
-- the scatter connector (children, Phase 3), from inside its container
-
-Mozart's own ``POST /workflow/runs`` (it *is* mozart) submits the entry job with
-:func:`submit_workflow_job_inprocess`, which runs the same two calls that
-``/job/submit`` makes after parsing its form.
-
-Every workflow job is submitted with ``enable_dedup=true``. The orchestrator folds
-the workflow tag (run_id, step_id, child_index) into the dedup hash.
+Jobs submitted this way get exactly the semantics of any other HySDS job submission, plus any
+policy that endpoint enforces (auth, attribution, quotas). Used by the reaper's revoke path.
 """
 
 import json
@@ -20,21 +9,7 @@ import os
 
 import requests
 
-# connector job_spec ids (mozart/configs/workflow_connectors)
-CONNECTOR_JOB_TYPES = {
-    "pass": "job-workflow-pass:v1.0.0",
-    "scatter": "job-workflow-scatter:v1.0.0",
-    "gather": "job-workflow-gather:v1.0.0",
-    "switch": "job-workflow-switch:v1.0.0",  # also serves gate
-    "finalize": "job-workflow-finalize:v1.0.0",
-    "halt": "job-workflow-halt:v1.0.0",
-}
-
-# internal step ids for runtime-materialized connectors
-FINALIZE_STEP = "_finalize"
-HALT_STEP = "_halt"
-
-# env fallback for the mozart REST base URL (e.g. inside connector containers)
+# env fallback for the mozart REST base URL
 MOZART_REST_URL_ENV = "MOZART_REST_URL"
 DEFAULT_TIMEOUT = 30
 
@@ -43,21 +18,8 @@ class WorkflowSubmitError(Exception):
     """Mozart rejected the submission, or it could not be reached."""
 
 
-def workflow_tag(run_id, step_id, spec_id, child_index=None, child_total=None):
-    return {
-        "run_id": run_id,
-        "step_id": step_id,
-        "spec_id": spec_id,
-        "child_index": child_index,
-        "child_total": child_total,
-    }
-
-
 def _default_tags(workflow):
-    """Job tags when the caller gives none: the step id (the node id; ``_finalize`` / ``_halt``
-    for the internal connectors). Callers pass ``tags=[job_tag(node, id)]`` to apply a spec node's
-    ``tag``. Nothing else is imposed: runs are found by the ``workflow.*`` fields, and run-level
-    tags live on the run doc only."""
+    """Job tags when the caller gives none: the step id. Run-level tags live on the run doc only."""
     return [workflow["step_id"]]
 
 
@@ -104,47 +66,3 @@ def submit_workflow_job(job_type, queue, params, workflow, priority=5, tags=None
         raise WorkflowSubmitError(
             f"mozart /job/submit failed (HTTP {r.status_code}): {body.get('message')}")
     return body["result"]
-
-
-def submit_workflow_job_inprocess(job_type, queue, params, workflow, priority=5, tags=None,
-                                  username=None, job_name=None):
-    """In-process equivalent of ``/job/submit``, for mozart itself only."""
-    from hysds_commons.job_utils import resolve_hysds_job, submit_hysds_job
-
-    job = resolve_hysds_job(
-        job_type=job_type,
-        queue=queue,
-        priority=priority,
-        tags=json.dumps(tags if tags is not None else _default_tags(workflow)),
-        params=params,
-        job_name=job_name,
-        enable_dedup=True,
-        username=username,
-        workflow=workflow,
-    )
-    return submit_hysds_job(job)
-
-
-RETRY_JOB_TYPE = "job-lw-mozart-retry"
-RETRY_QUEUE = "system-jobs-queue"  # required_queues of the lw-mozart-retry job_spec
-
-
-def retry_params(job_id, max_retries):
-    """Params for mozart's ``job-lw-mozart-retry`` as issued by the consumer (contract 12.3).
-    ``workflow_retry`` lets retry.py's D5 guard (12.4) accept a workflow-tagged job."""
-    return {
-        "retry_job_id": job_id,
-        "retry_count_max": max_retries,
-        "job_priority_increment": 0,
-        "workflow_retry": True,
-    }
-
-
-def connector_params(run_id, step_id, spec_id, workflow_event):
-    """Context params every connector job receives (contract §4)."""
-    return {
-        "run_id": run_id,
-        "step_id": step_id,
-        "spec_id": spec_id,
-        "workflow_event": json.dumps(workflow_event),
-    }
