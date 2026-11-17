@@ -330,6 +330,17 @@ class TestRequirements:
         st = compile_(wf).spec["steps"]["a"]
         assert st.get("time_limit") == expected
 
+    def test_time_limit_zero_warns_and_the_job_types_limit_applies(self):
+        wf = base()
+        wf["steps"]["a"]["hints"] = {"ToolTimeLimit": {"timelimit": 0}}
+        res = compile_(wf)
+        assert res.ok and "time_limit" not in res.spec["steps"]["a"]
+        w = [x for x in res.warnings if x["code"] == "timelimit_zero"]
+        assert len(w) == 1 and w[0]["message"] == (
+            "ToolTimeLimit 0 (no limit) is not supported; the job type's time_limit applies")
+        wf["steps"]["a"]["hints"] = {"ToolTimeLimit": {"timelimit": 5}}
+        assert "timelimit_zero" not in codes(compile_(wf).warnings)
+
     def test_most_specific_wins(self):
         wf = base()
         wf["hints"] = {"hysds:Queue": {"queue": "wfq"}}

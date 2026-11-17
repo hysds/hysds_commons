@@ -125,6 +125,9 @@ def _emit_step(model, st, warnings):
     ttl = P.effective_std(levels, "ToolTimeLimit")
     if ttl and ttl.get("timelimit"):
         out["time_limit"] = int(math.ceil(ttl["timelimit"]))
+    elif ttl and ttl.get("timelimit") == 0:
+        warnings.append(issue("steps.%s.ToolTimeLimit" % sid, "timelimit_zero",
+                              "ToolTimeLimit 0 (no limit) is not supported; the job type's time_limit applies"))
     out["deps"] = deps
     if st["when_flag"]:
         out["when"] = _ref(P._flag_source(st))
