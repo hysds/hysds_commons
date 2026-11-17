@@ -32,6 +32,13 @@ setup(
         "jsonschema>=3.0.1",
         "shapely>=1.8.2"
     ],
+    extras_require={
+        # CWL workflow authoring (mozart registration only); nothing else in hysds_commons imports these.
+        "cwl": [
+            "cwltool==3.1.20251031082601",
+            "cwl-utils>=0.40,<0.48",
+        ],
+    },
     classifiers=[
         "Development Status :: 5 - Production/Stable",
         "Intended Audience :: Developers",
