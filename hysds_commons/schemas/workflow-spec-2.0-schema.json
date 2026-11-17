@@ -101,16 +101,7 @@
           "required": ["input"],
           "properties": {
             "input": {"type": "string", "minLength": 1},
-            "threshold": {"type": "number", "exclusiveMinimum": 0, "maximum": 1},
-            "connector": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": ["job_type"],
-              "properties": {
-                "job_type": {"type": "string", "minLength": 1},
-                "queue": {"type": "string", "minLength": 1}
-              }
-            }
+            "threshold": {"type": "number", "exclusiveMinimum": 0, "maximum": 1}
           }
         },
         "out": {"$ref": "#/definitions/names"}

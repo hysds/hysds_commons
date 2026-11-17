@@ -14,7 +14,6 @@ from hysds_commons.workflow_run2 import (
     mark_step_cancelled,
     mark_step_completed,
     mark_step_failed,
-    mark_scatter_connector,
     mark_scatter_fanout,
     mark_step_halted,
     mark_step_queued,
@@ -78,7 +77,7 @@ def test_new_run_doc_shape():
     assert all(s["state"] == "waiting" and s["attempts"] == [] for s in d["steps"].values())
     assert d["steps"]["l1a"]["scatter"] == {"input": "l0b_file", "threshold": 0.95, "expected": None,
                                             "n_completed": 0, "n_failed": 0, "children": [],
-                                            "phase": None, "connector": None}
+                                            "phase": None}
     assert d["steps"]["reject"]["kind"] == "halt" and d["steps"]["reject"]["halt"] == {
         "status": "failed", "reason": "L2SMP failed QA", "fired": False}
     assert d["steps"]["l1b"]["job_type"] == "job-radiometer-l1b:v3.2"
@@ -183,7 +182,7 @@ def test_scatter_updates():
     d = update_scatter(d, "l1a", n_completed=3, n_failed=1)
     sc = d["steps"]["l1a"]["scatter"]
     assert sc == {"input": "l0b_file", "threshold": 0.95, "expected": 4, "n_completed": 3, "n_failed": 1,
-                  "children": ["c1", "c2", "c3", "c4"], "phase": None, "connector": None}
+                  "children": ["c1", "c2", "c3", "c4"], "phase": None}
     assert validate_run_doc(d) == []
 
 
@@ -288,16 +287,12 @@ def test_validate_not_dict_and_check():
         check_run_doc(d)
 
 
-def test_scatter_connector_job_type_is_frozen_and_phases():
+def test_scatter_fanout_phase():
     s = spec()
-    s["steps"]["l1a"]["scatter"]["connector"] = {"job_type": "job-lister:v1", "queue": "q"}
-    assert "job-lister:v1" in job_types(s)
+    assert job_types(s) == sorted({v["job_type"] for v in s["steps"].values() if "job_type" in v})
     d = new_run_doc(s, "r", {}, freeze_job_definitions(s, fetch), created_at=T)
-    assert d["steps"]["l1a"]["scatter"]["connector"] == {"job_type": "job-lister:v1", "queue": "q"}
-    d = mark_scatter_connector(d, "l1a", "conn-1")
-    assert d["steps"]["l1a"]["scatter"]["phase"] == "connector" and d["steps"]["l1a"]["state"] == "queued"
-    assert validate_run_doc(d) == []
-    d = mark_scatter_fanout(end_attempt(d, "l1a", "completed"), "l1a", 3)
+    assert d["steps"]["l1a"]["scatter"]["phase"] is None and "connector" not in d["steps"]["l1a"]["scatter"]
+    d = mark_scatter_fanout(d, "l1a", 3)
     sc = d["steps"]["l1a"]
     assert (sc["state"], sc["scatter"]["expected"], sc["scatter"]["phase"]) == ("running", 3, "children")
     assert validate_run_doc(d) == []

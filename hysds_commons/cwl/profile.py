@@ -42,7 +42,7 @@ PARAM_REJECTED = ("secondaryFiles", "format", "loadContents", "loadListing")
 HYSDS_HINTS = {
     # name: levels where it may appear
     "JobType": ("op",), "Halt": ("op",), "OnError": ("wf",), "Queue": ("wf", "step", "op"),
-    "Retry": ("wf", "step", "op"), "Gather": ("step",), "ScatterConnector": ("step",), "Tag": ("step",),
+    "Retry": ("wf", "step", "op"), "Gather": ("step",), "Tag": ("step",),
 }
 
 
@@ -266,6 +266,12 @@ def collect_level(kind, path, req, hints, namespaces, issues):
                 if field == "requirements":
                     issues.error(where, "hysds_requirement", "hysds: classes are hints, not requirements: move %s to hints" % cls)
                     continue
+                if name == "ScatterConnector":
+                    issues.error(where, "scatter_connector_removed",
+                                 "hysds:ScatterConnector is no longer supported; list the items in an ordinary job step "
+                                 "(a mission lister whose output is a list) and scatter over its output "
+                                 "('in: {item: lister/items}')")
+                    continue
                 if name not in HYSDS_HINTS:
                     issues.error(where, "unknown_hysds_hint", "unknown hysds hint '%s' (known: %s)" % (name, ", ".join(sorted(HYSDS_HINTS))))
                     continue
@@ -337,9 +343,6 @@ def check_hysds_fields(lv, issues):
             if not _num(p) or not (0 <= p < 100):
                 issues.error(where + ".tolerated_failure_percentage", "bad_hint",
                              "hysds:Gather.tolerated_failure_percentage must be a number from 0 up to (not including) 100")
-        elif name == "ScatterConnector":
-            if not isinstance(body.get("job_type"), str) or not body["job_type"]:
-                issues.error(where + ".job_type", "bad_hint", "hysds:ScatterConnector.job_type must be a string")
         elif name == "Tag":
             if not isinstance(body.get("tag"), str) or not body["tag"]:
                 issues.error(where + ".tag", "bad_hint", "hysds:Tag.tag must be a non-empty string")
@@ -793,9 +796,8 @@ def _analyze_step(sid, st, wf_level, ns, records, run_resolver, issues):
         issues.error(path + ".scatterMethod", "scatter_unsupported", "scatterMethod without scatter")
 
     # step-level scatter-only hints
-    for h in ("Gather", "ScatterConnector"):
-        if h in step_lv.hysds and not step["scatter"]:
-            issues.error("%s.hints.hysds:%s" % (path, h), "misplaced_hint", "hysds:%s is only allowed on a scattered step" % h)
+    if "Gather" in step_lv.hysds and not step["scatter"]:
+        issues.error("%s.hints.hysds:Gather" % path, "misplaced_hint", "hysds:Gather is only allowed on a scattered step")
     gather = effective(step["levels"], "Gather") or {}
     step["tolerance"] = gather.get("tolerated_failure_percentage", 0) if _num(gather.get("tolerated_failure_percentage", 0)) else 0
 

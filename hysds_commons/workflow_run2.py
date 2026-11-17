@@ -13,7 +13,7 @@ Run doc::
      "steps": {step_id: {"kind": "job"|"halt", "state", "job_type", "job_id", "started_at", "ended_at",
                          "attempts": [{"attempt", "job_id", "status", "started_at", "ended_at", "error"}],
                          "scatter": {"input", "threshold", "expected", "n_completed", "n_failed", "children",
-                                     "phase": null|"connector"|"children", "connector": {job_type, queue}|null},
+                                     "phase": null|"children"},
                          "skipped_by": {"flag", "value"}, "cancelled_by": {"kind", "step", "reason"},
                          "halt": {"status", "reason", "fired"}, "error", "error_class"}},
      "job_definitions": {job_type: {"job_spec", "hysds_io", "container", "queue"}}}
@@ -55,14 +55,9 @@ def short_error(error):
 
 
 def job_types(spec):
-    """Sorted distinct job types used by the job steps of a 2.0 spec, plus the ``hysds:ScatterConnector``
-    job types (frozen too: a running workflow never reads job definitions from OpenSearch)."""
-    jts = {s["job_type"] for s in spec["steps"].values() if "job_type" in s}
-    for s in spec["steps"].values():
-        conn = (s.get("scatter") or {}).get("connector")
-        if conn and conn.get("job_type"):
-            jts.add(conn["job_type"])
-    return sorted(jts)
+    """Sorted distinct job types used by the job steps of a 2.0 spec (frozen: a running workflow never
+    reads job definitions from OpenSearch)."""
+    return sorted({s["job_type"] for s in spec["steps"].values() if "job_type" in s})
 
 
 def freeze_job_definitions(spec, fetch):
@@ -89,10 +84,9 @@ def new_run_doc(spec, run_id, inputs, job_definitions, created_at=None, spec_sha
         if halt:
             st["halt"] = {"status": s["halt"]["status"], "reason": s["halt"].get("reason"), "fired": False}
         if "scatter" in s:
-            conn = s["scatter"].get("connector")
             st["scatter"] = {"input": s["scatter"]["input"], "threshold": s["scatter"].get("threshold", 1.0),
                              "expected": None, "n_completed": 0, "n_failed": 0, "children": [],
-                             "phase": None, "connector": copy.deepcopy(conn) if conn else None}
+                             "phase": None}
         steps[sid] = st
     return {
         "schema_version": RUN_DOC_SCHEMA_VERSION, "run_id": run_id,
@@ -244,18 +238,9 @@ def mark_step_halted(doc, sid, now=None):
     return _next(doc, m)
 
 
-def mark_scatter_connector(doc, sid, job_id, now=None):
-    """The scatter connector job was submitted: like :func:`mark_step_queued`, and the scatter is in
-    phase ``connector`` (the attempts of the step are the connector's)."""
-    new = mark_step_queued(doc, sid, job_id, now=now)
-    new["steps"][sid]["scatter"]["phase"] = "connector"
-    return new
-
-
 def mark_scatter_fanout(doc, sid, expected, now=None):
     """The item list is known (``expected`` children): the step is running, in phase ``children``. Children
-    are ordinary jobs tracked in Redis, so the step has no attempt of its own (a connector attempt, if any,
-    stays as the record of the lister job)."""
+    are ordinary jobs tracked in Redis, so the step has no attempt of its own."""
     now = now or utcnow_iso()
     st0 = _step(doc, sid)
     if "scatter" not in st0:
