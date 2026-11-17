@@ -257,6 +257,44 @@ def check_registry(model, lookup, errors):
                                         "'%s' is not an output of job type '%s' (outputs: %s)" % (name, jt, ", ".join(sorted(outs)) or "none")))
 
 
+def _allowed_connector_map(allowed):
+    """Normalize ``allowed_connectors`` to ``{job_type: queue_or_None}``, or None (no check).
+
+    Accepts the deployment's ``WORKFLOW_CONNECTORS`` shape (PLAN 11.2: ``{kind: {"default", "allowed":
+    {job_type: queue}}}``; only the ``scatter`` kind applies to ``hysds:ScatterConnector``), a plain
+    ``{job_type: queue}`` mapping, or an iterable of job types."""
+    if allowed is None:
+        return None
+    if isinstance(allowed, dict):
+        sc = allowed.get("scatter")
+        if isinstance(sc, dict) and "allowed" in sc:  # the WORKFLOW_CONNECTORS shape
+            allowed = sc["allowed"] or {}
+        return {k: (v if isinstance(v, str) and v else None) for k, v in allowed.items()}
+    return {jt: None for jt in allowed}
+
+
+def check_connectors(model, allowed, errors):
+    """``hysds:ScatterConnector`` job types must be in the deployment allowlist (code ``connector_not_allowed``)."""
+    amap = _allowed_connector_map(allowed)
+    if amap is None:
+        return
+    for sid, st in model["steps"].items():
+        sc = P.effective(st["levels"], "ScatterConnector") if st.get("scatter") else None
+        if sc and sc.get("job_type") not in amap:
+            errors.append(issue("steps.%s.hints.hysds:ScatterConnector.job_type" % sid, "connector_not_allowed",
+                                "scatter connector '%s' is not allowed on this deployment (allowed: %s)" % (
+                                    sc.get("job_type"), ", ".join(sorted(amap)) or "none")))
+
+
+def _fill_connector_queues(spec, allowed):
+    """A connector hint without a queue gets the allowlist's queue for its job type (as v1 did)."""
+    amap = _allowed_connector_map(allowed) or {}
+    for st in spec["steps"].values():
+        conn = (st.get("scatter") or {}).get("connector")
+        if conn and not conn.get("queue") and amap.get(conn["job_type"]):
+            conn["queue"] = amap[conn["job_type"]]
+
+
 # --------------------------------------------------------------------------------------------- driver
 
 
@@ -268,12 +306,14 @@ def _split(items):
     return errs, warns
 
 
-def compile_cwl(source, job_type_lookup=None, run_resolver=None):
+def compile_cwl(source, job_type_lookup=None, run_resolver=None, allowed_connectors=None):
     """Compile CWL ``source`` (bytes or str) to a 2.0 spec.
 
     ``job_type_lookup(job_type) -> {"inputs"|"params": [...], "outputs": [...]} | None`` enables the
     registry checks (omit to skip them). ``run_resolver(ref) -> Operation dict | None`` inlines
-    registry-generated ``run:`` references (B17). Returns a ``CompileResult``.
+    registry-generated ``run:`` references (B17). ``allowed_connectors`` is the deployment allowlist of
+    ``hysds:ScatterConnector`` job types (mozart's ``WORKFLOW_CONNECTORS`` setting, or a list of job types);
+    a job type outside it fails with ``connector_not_allowed``; ``None`` means no check. Returns a ``CompileResult``.
     """
     res = CompileResult()
     loaded = load_document(source)
@@ -300,11 +340,14 @@ def compile_cwl(source, job_type_lookup=None, run_resolver=None):
 
     if model is not None and job_type_lookup is not None:
         check_registry(model, job_type_lookup, res.errors)
+    if model is not None:
+        check_connectors(model, allowed_connectors, res.errors)
 
     if res.errors or model is None:
         return res
 
     spec = emit_spec(model, loaded.sha256, res.warnings)
+    _fill_connector_queues(spec, allowed_connectors)
     for msg in _validate_compiled(spec):
         res.errors.append(issue("", "spec_invalid", str(msg)))
     if res.errors:
@@ -315,9 +358,9 @@ def compile_cwl(source, job_type_lookup=None, run_resolver=None):
     return res
 
 
-def compile_cwl_or_raise(source, job_type_lookup=None, run_resolver=None):
+def compile_cwl_or_raise(source, job_type_lookup=None, run_resolver=None, allowed_connectors=None):
     """Like ``compile_cwl`` but returns the spec dict, raising ``CWLCompileError`` on any error."""
-    res = compile_cwl(source, job_type_lookup, run_resolver)
+    res = compile_cwl(source, job_type_lookup, run_resolver, allowed_connectors)
     if not res.ok:
         raise CWLCompileError(res.errors)
     return res.spec
