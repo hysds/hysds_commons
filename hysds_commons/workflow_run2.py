@@ -9,13 +9,14 @@ Run doc::
     {"schema_version": "2.0", "run_id", "spec_id", "spec_version", "spec_sha256",
      "version": int, "status": running|halting|completed|failed|cancelled, "on_error",
      "inputs": {...}, "outputs": {...}|None, "created_at", "started_at", "ended_at",
-     "error_class", "reason", "failed_step", "cancelled_by",
+     "error_class", "reason", "failed_step", "cancelled_by", "resumed_from" (optional: the run this resumes),
      "steps": {step_id: {"kind": "job"|"halt", "state", "job_type", "job_id", "started_at", "ended_at",
                          "attempts": [{"attempt", "job_id", "status", "started_at", "ended_at", "error"}],
                          "scatter": {"input", "threshold", "expected", "n_completed", "n_failed", "children",
                                      "phase": null|"children"},
                          "skipped_by": {"flag", "value"}, "cancelled_by": {"kind", "step", "reason"},
-                         "halt": {"status", "reason", "fired"}, "error", "error_class"}},
+                         "halt": {"status", "reason", "fired"}, "error", "error_class",
+                         "reused_from" (optional: carried over settled from that run by a resume)}},
      "job_definitions": {job_type: {"job_spec", "hysds_io", "container", "queue"}}}
 
 Step outputs and full errors are deliberately not stored (job docs hold them, §6.10).
@@ -97,6 +98,71 @@ def new_run_doc(spec, run_id, inputs, job_definitions, created_at=None, spec_sha
         "error_class": None, "reason": None, "failed_step": None, "cancelled_by": None,
         "steps": steps, "job_definitions": copy.deepcopy(job_definitions or {}),
     }
+
+
+# --------------------------------------------------------------------------- resume
+# A failed or cancelled run is resumed as a NEW run (``resumed_from`` = the old run id) on the same compiled
+# spec and the old run's frozen job definitions. Its job steps that completed, and steps that were skipped,
+# are carried over already settled (``reused_from`` on the step, attempts and job ids kept) with their
+# recorded outputs; everything else starts ``waiting``. The old run is never changed.
+
+RESUMABLE_RUN_STATUSES = frozenset({"failed", "cancelled"})
+REUSABLE_STEP_STATES = frozenset({"completed", "skipped"})
+_CARRIED_STEP_KEYS = ("state", "job_id", "started_at", "ended_at", "attempts", "scatter", "skipped_by")
+
+
+def reusable_steps(spec, old_doc):
+    """Sorted ids of the steps of ``old_doc`` a resume carries over: job steps that completed and steps that
+    were skipped, whose deps are all carried over too (a halt step is never carried, so it is evaluated again,
+    and so is everything downstream of it)."""
+    steps = spec["steps"]
+    old = old_doc.get("steps") or {}
+    keep = set()
+    changed = True
+    while changed:
+        changed = False
+        for sid, step in steps.items():
+            if sid in keep or "halt" in step:
+                continue
+            st = old.get(sid) or {}
+            if st.get("state") not in REUSABLE_STEP_STATES:
+                continue
+            if all(d in keep for d in step.get("deps") or []):
+                keep.add(sid)
+                changed = True
+    return sorted(keep)
+
+
+def gather_scatter_outputs(out_names, n, child_outputs):
+    """The recorded outputs of a completed scattered step rebuilt from its children: one index-aligned list per
+    output name, ``None`` where child ``i`` has no outputs (it failed). ``child_outputs``: ``{index: {name: value}}``
+    of the completed children. Same shape as the engine's gather."""
+    return {name: [(child_outputs.get(i) or {}).get(name) if i in child_outputs else None for i in range(n)]
+            for name in out_names or []}
+
+
+def resumed_run_doc(spec, old_doc, run_id, reused, created_at=None):
+    """The run doc of a resume of ``old_doc`` (status failed or cancelled; raises :class:`WorkflowRunError`
+    otherwise). ``reused``: the step ids carried over (normally :func:`reusable_steps`). Inputs, job
+    definitions and ``spec_sha256`` are the old run's. Each carried step keeps the old state, job ids, attempts
+    and times, plus ``reused_from`` = the old run id."""
+    if old_doc.get("status") not in RESUMABLE_RUN_STATUSES:
+        raise WorkflowRunError("only a failed or cancelled run can be resumed (run %s is %s)"
+                               % (old_doc.get("run_id"), old_doc.get("status")))
+    doc = new_run_doc(spec, run_id, old_doc.get("inputs") or {}, old_doc.get("job_definitions") or {},
+                      created_at=created_at, spec_sha256=old_doc.get("spec_sha256"))
+    doc["resumed_from"] = old_doc["run_id"]
+    for sid in reused:
+        old = old_doc["steps"][sid]
+        if old.get("state") not in REUSABLE_STEP_STATES:
+            raise WorkflowRunError("step %r was %s in run %s and cannot be reused"
+                                   % (sid, old.get("state"), old_doc["run_id"]))
+        st = doc["steps"][sid]
+        for k in _CARRIED_STEP_KEYS:
+            if k in old:
+                st[k] = copy.deepcopy(old[k])
+        st["reused_from"] = old_doc["run_id"]
+    return doc
 
 
 # --------------------------------------------------------------------------- transitions
@@ -336,6 +402,8 @@ def validate_run_doc(doc):
         e.append("error_class: required when the run failed")
     if doc.get("status") == "cancelled" and not doc.get("cancelled_by"):
         e.append("cancelled_by: required when the run is cancelled")
+    if doc.get("resumed_from") is not None and (not isinstance(doc["resumed_from"], str) or not doc["resumed_from"]):
+        e.append("resumed_from: must be a non-empty string (the run id this run resumes) or absent")
     steps = doc.get("steps")
     if not isinstance(steps, dict) or not steps:
         e.append("steps: must be a non-empty object")
@@ -406,6 +474,11 @@ def _validate_step(sid, st, defs, e):
         e.append("%s: a failed step needs error or error_class" % w)
     if state in TERMINAL_STEP_STATES and not st.get("ended_at"):
         e.append("%s.ended_at: required for state %s" % (w, state))
+    if st.get("reused_from") is not None:
+        if not isinstance(st["reused_from"], str) or not st["reused_from"]:
+            e.append("%s.reused_from: must be a non-empty string (the run id) or absent" % w)
+        if state not in REUSABLE_STEP_STATES:
+            e.append("%s.reused_from: a reused step must be completed or skipped, not %s" % (w, state))
     if st.get("kind") == "halt":
         h = st.get("halt")
         if not isinstance(h, dict) or h.get("status") not in ("failed", "completed") or not isinstance(h.get("fired"), bool):

@@ -9,6 +9,7 @@ from hysds_commons.workflow_run2 import (
     check_run_doc,
     end_attempt,
     freeze_job_definitions,
+    gather_scatter_outputs,
     is_newer,
     job_types,
     mark_step_cancelled,
@@ -20,6 +21,8 @@ from hysds_commons.workflow_run2 import (
     mark_step_running,
     mark_step_skipped,
     new_run_doc,
+    resumed_run_doc,
+    reusable_steps,
     set_run_outputs,
     set_run_status,
     set_version,
@@ -301,3 +304,85 @@ def test_scatter_fanout_phase():
 def test_fanned_out_scatter_step_has_no_attempt_of_its_own():
     d = mark_scatter_fanout(doc(), "l1a", 2)
     assert d["steps"]["l1a"]["attempts"] == [] and validate_run_doc(d) == []
+
+
+# --------------------------------------------------------------------------- resume
+
+
+def _failed_at_l2smp():
+    """find_l0b, l1a (scatter), l1b, l1c, make_browse completed; l2smp failed; the rest cancelled."""
+    s = spec()
+    d = doc()
+    for sid in ("find_l0b", "l1b", "l1c", "make_browse"):
+        d = mark_step_completed(end_attempt(mark_step_running(mark_step_queued(d, sid, "j-" + sid, now=T), sid, now=T),
+                                            sid, "completed", now=T), sid, now=T)
+    d = mark_scatter_fanout(d, "l1a", 2, now=T)
+    d = mark_step_completed(update_scatter(d, "l1a", n_completed=2, n_failed=0, children=["c0", "c1"]), "l1a", now=T)
+    d = mark_step_failed(end_attempt(mark_step_running(mark_step_queued(d, "l2smp", "j-l2smp", now=T), "l2smp", now=T),
+                                     "l2smp", "failed", now=T, error="boom"), "l2smp", now=T, error="boom",
+                         error_class="exit_code:1")
+    for sid in unsettled_steps(d):
+        d = mark_step_cancelled(d, sid, "failure", by_step="l2smp", now=T)
+    d = set_run_status(d, "failed", now=T, error_class="exit_code:1", reason="boom", failed_step="l2smp")
+    assert validate_run_doc(d) == []
+    return s, d
+
+
+def test_reusable_steps_keeps_completed_and_skipped_with_carried_deps():
+    s, d = _failed_at_l2smp()
+    assert reusable_steps(s, d) == ["find_l0b", "l1a", "l1b", "l1c", "make_browse"]
+    # a completed step under a re-run dep is re-run too
+    d2 = copy.deepcopy(d)
+    d2["steps"]["l1b"]["state"] = "failed"
+    assert reusable_steps(s, d2) == ["find_l0b", "l1a"]
+    # a fired halt is never carried (it is evaluated again)
+    d3 = copy.deepcopy(d)
+    d3["steps"]["reject"]["state"] = "completed"
+    assert "reject" not in reusable_steps(s, d3)
+
+
+def test_resumed_run_doc():
+    s, d = _failed_at_l2smp()
+    reused = reusable_steps(s, d)
+    r = resumed_run_doc(s, d, "run-2", reused, created_at=T)
+    assert validate_run_doc(r) == []
+    assert r["run_id"] == "run-2" and r["resumed_from"] == "run-1" and r["version"] == 1
+    assert r["status"] == "running" and r["inputs"] == d["inputs"] and r["job_definitions"] == d["job_definitions"]
+    assert r["spec_sha256"] == d["spec_sha256"] and r["error_class"] is None and r["ended_at"] is None
+    for sid in reused:
+        assert r["steps"][sid]["state"] == "completed" and r["steps"][sid]["reused_from"] == "run-1"
+        assert r["steps"][sid]["attempts"] == d["steps"][sid]["attempts"]
+    assert r["steps"]["l1a"]["scatter"]["children"] == ["c0", "c1"]
+    for sid in ("l2smp", "qa_check", "deliver", "reject", "reprocess_l2smp"):
+        assert r["steps"][sid]["state"] == "waiting" and r["steps"][sid]["attempts"] == []
+        assert "reused_from" not in r["steps"][sid]
+    assert d["steps"]["l1b"].get("reused_from") is None  # old doc untouched
+
+
+def test_resume_refuses_live_or_completed_runs_and_unsettled_steps():
+    s, d = _failed_at_l2smp()
+    for status in ("running", "halting", "completed"):
+        with pytest.raises(WorkflowRunError):
+            resumed_run_doc(s, dict(d, status=status), "run-2", [])
+    with pytest.raises(WorkflowRunError):
+        resumed_run_doc(s, d, "run-2", ["l2smp"])
+    cancelled = set_run_status(doc(), "cancelled", now=T, cancelled_by="u")
+    assert resumed_run_doc(s, cancelled, "run-3", [])["resumed_from"] == "run-1"
+
+
+def test_validate_reused_and_resumed_from():
+    s, d = _failed_at_l2smp()
+    r = resumed_run_doc(s, d, "run-2", ["find_l0b"], created_at=T)
+    bad = copy.deepcopy(r)
+    bad["resumed_from"] = ""
+    bad["steps"]["l2smp"]["reused_from"] = "run-1"
+    errs = validate_run_doc(bad)
+    assert any(e.startswith("resumed_from") for e in errs)
+    assert any("steps.l2smp.reused_from" in e for e in errs)
+
+
+def test_gather_scatter_outputs():
+    assert gather_scatter_outputs(["a", "b"], 3, {0: {"a": 1, "b": 2}, 2: {"a": 5}}) == {
+        "a": [1, None, 5], "b": [2, None, None]}
+    assert gather_scatter_outputs([], 2, {}) == {}
+    assert gather_scatter_outputs(["a"], 0, {}) == {"a": []}
